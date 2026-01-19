@@ -13,7 +13,7 @@ import makeWASocket, {
     useMultiFileAuthState,
     proto,
 } from 'baileys'
-
+import { useSQLiteAuthState } from './auth/sqliteAuth.js'
 import { parseMessage } from './messages/parser.js'
 import { dispatchEvent } from './events/dispatcher.js'
 
@@ -35,11 +35,15 @@ async function getMessage(
     return proto.Message.fromObject({})
 }
 
-const startSock = async () => {
-    const { state, saveCreds } = await useMultiFileAuthState(
-        'baileys_auth_info'
-    )
 
+//const startSock = async () => {
+//    const { state, saveCreds } = await useMultiFileAuthState(
+//        'baileys_auth_info'
+//    )
+const startSock = async () => {
+    const { state, saveCreds } = await useSQLiteAuthState(
+        './data/auth/whatsapp.sqlite'
+    )
     const { version } = await fetchLatestBaileysVersion()
 
     console.log(`\n🤖 Bot Iniciado (Baileys v${version.join('.')})`)
