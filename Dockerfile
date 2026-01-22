@@ -1,15 +1,13 @@
-bashCopy code
-# Use the official Node.js image as the base image
-FROM node:18
+FROM node:24
 
-# Set the working directory in the container
 WORKDIR /app
 
-# Copy the application files into the working directory
-COPY . /app
+COPY package*.json ./
+RUN npm ci --omit=dev
 
-# Install the application dependencies
-RUN npm install
+COPY . .
 
-# Define the entry point for the container
-CMD ["npm", "start"]
+ENV NODE_ENV=production
+EXPOSE 3000
+
+CMD ["node", "index.js"]
