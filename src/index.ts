@@ -1,6 +1,6 @@
 import { Boom } from '@hapi/boom'
 import NodeCache from '@cacheable/node-cache'
-import readline from 'readline'
+//import readline from 'readline'
 import P from 'pino'
 
 import makeWASocket, {
@@ -19,7 +19,7 @@ import { dispatchEvent } from './events/dispatcher.js'
 
 const logger = P({ level: 'silent' })
 const msgRetryCounterCache = new NodeCache() as CacheStore
-
+/*
 const rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout,
@@ -27,7 +27,7 @@ const rl = readline.createInterface({
 
 const question = (text: string) =>
     new Promise<string>((resolve) => rl.question(text, resolve))
-
+*/
 async function getMessage(
     key: WAMessageKey
 ): Promise<WAMessageContent | undefined> {
@@ -64,12 +64,13 @@ const startSock = async () => {
     // 🔐 Pareamento por código
     if (!sock.authState.creds.registered) {
         console.log('\n⚠️  Aparelho não registrado.')
-
         setTimeout(async () => {
-            const phoneNumber = await question(
-                'Digite o número do WhatsApp (ex: 5511999998888): '
-            )
-
+            /*
+                                const phoneNumber = await question(
+                                    'Digite o número do WhatsApp (ex: 5511999998888): '
+                                )
+                    */
+            const phoneNumber = process.env.WHATSAPP_PHONE_NUMBER || ''
             try {
                 const code = await sock.requestPairingCode(
                     phoneNumber.replace(/\D/g, '')
