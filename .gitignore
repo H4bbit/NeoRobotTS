@@ -1,4 +1,4 @@
 dist/
 node_modules/
 data/auth/whatsapp.sqlite
-data/bot/
+data/
