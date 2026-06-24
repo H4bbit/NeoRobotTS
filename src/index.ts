@@ -1,145 +1,137 @@
-import { Boom } from '@hapi/boom'
-import NodeCache from '@cacheable/node-cache'
-//import readline from 'readline'
-import P from 'pino'
+import { Boom } from "@hapi/boom";
+import NodeCache from "@cacheable/node-cache";
+import P from "pino";
+import fs from "node:fs";
 
-import makeWASocket, {
-    type CacheStore,
-    type WAMessageContent,
-    type WAMessageKey,
-    DisconnectReason,
-    fetchLatestBaileysVersion,
-    makeCacheableSignalKeyStore,
-    useMultiFileAuthState,
-    proto,
-} from 'baileys'
-import { useSQLiteAuthState } from './auth/sqliteAuth.js'
-import { parseMessage } from './messages/parser.js'
-import { dispatchEvent } from './events/dispatcher.js'
+import {
+  makeWASocket,
+  type CacheStore,
+  type WAMessageContent,
+  type WAMessageKey,
+  DisconnectReason,
+  fetchLatestBaileysVersion,
+  makeCacheableSignalKeyStore,
+  proto,
+} from "baileys";
 
-const logger = P({ level: 'silent' })
-const msgRetryCounterCache = new NodeCache() as CacheStore
-/*
-const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout,
-})
+import { useSQLiteAuthState } from "./auth/sqliteAuth.js";
+import { parseMessage } from "./messages/parser.js";
+import { dispatchEvent } from "./events/dispatcher.js";
 
-const question = (text: string) =>
-    new Promise<string>((resolve) => rl.question(text, resolve))
-*/
+const logger = P({ level: "silent" });
+const msgRetryCounterCache = new NodeCache() as CacheStore;
+
 async function getMessage(
-    key: WAMessageKey
+  key: WAMessageKey,
 ): Promise<WAMessageContent | undefined> {
-    // Placeholder para evitar erro de retry
-    return proto.Message.fromObject({})
+  return proto.Message.fromObject({});
 }
 
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-//const startSock = async () => {
-//    const { state, saveCreds } = await useMultiFileAuthState(
-//        'baileys_auth_info'
-//    )
 const startSock = async () => {
-    const { state, saveCreds } = await useSQLiteAuthState(
-        './data/auth/whatsapp.sqlite'
-    )
-    const { version } = await fetchLatestBaileysVersion()
+  // 🔴 RESET FORÇADO (evita estado corrompido no Termux)
+  if (process.env.FORCE_RESET === "true") {
+    console.log("🧹 Resetando auth state...");
+    fs.rmSync("./data/auth", { recursive: true, force: true });
+  }
 
-    console.log(`\n🤖 Bot Iniciado (Baileys v${version.join('.')})`)
+  const { state, saveCreds } = await useSQLiteAuthState(
+    "./data/auth/whatsapp.sqlite",
+  );
 
-    const sock = makeWASocket({
-        version,
-        logger,
-        printQRInTerminal: false,
-        auth: {
-            creds: state.creds,
-            keys: makeCacheableSignalKeyStore(state.keys, logger),
-        },
-        msgRetryCounterCache,
-        generateHighQualityLinkPreview: true,
-        getMessage,
-    })
+  const { version } = await fetchLatestBaileysVersion();
 
-    // 🔐 Pareamento por código
-    if (!sock.authState.creds.registered) {
-        console.log('\n⚠️  Aparelho não registrado.')
-        setTimeout(async () => {
-            /*
-                                const phoneNumber = await question(
-                                    'Digite o número do WhatsApp (ex: 5511999998888): '
-                                )
-                    */
-            const phoneNumber = process.env.WHATSAPP_PHONE_NUMBER || ''
-            try {
-                const code = await sock.requestPairingCode(
-                    phoneNumber.replace(/\D/g, '')
-                )
+  console.log(`\n🤖 Bot Iniciado (Baileys v${version.join(".")})`);
 
-                console.log(
-                    `\n✅ CÓDIGO DE PAREAMENTO: ${code
-                        ?.match(/.{1,4}/g)
-                        ?.join('-')}`
-                )
+  const sock = makeWASocket({
+    version,
+    logger,
+    printQRInTerminal: false,
+    auth: {
+      creds: state.creds,
+      keys: makeCacheableSignalKeyStore(state.keys, logger),
+    },
+    msgRetryCounterCache,
+    generateHighQualityLinkPreview: true,
+    getMessage,
+  });
 
-                console.log(
-                    'Vá em: Aparelhos Conectados > Conectar com número de telefone\n'
-                )
-            } catch (err) {
-                console.error(
-                    'Erro ao gerar código. Verifique se o número está correto.',
-                    err
-                )
-            }
-        }, 3000)
+  sock.ev.process(async (events) => {
+    if (events["creds.update"]) {
+      await saveCreds();
     }
 
-    sock.ev.process(async (events) => {
-        // 💾 Persistir credenciais
-        if (events['creds.update']) {
-            await saveCreds()
+    if (events["connection.update"]) {
+      const { connection, lastDisconnect } = events["connection.update"];
+
+      if (connection === "close") {
+        const shouldReconnect =
+          (lastDisconnect?.error as Boom)?.output?.statusCode !==
+          DisconnectReason.loggedOut;
+
+        if (shouldReconnect) {
+          startSock();
         }
+      }
 
-        // 🔌 Estado da conexão
-        if (events['connection.update']) {
-            const { connection, lastDisconnect } =
-                events['connection.update']
+      if (connection === "open") {
+        console.log("✅ WhatsApp conectado com sucesso!");
+      }
+    }
 
-            if (connection === 'close') {
-                const shouldReconnect =
-                    (lastDisconnect?.error as Boom)?.output?.statusCode !==
-                    DisconnectReason.loggedOut
+    if (events["messages.upsert"]) {
+      const { messages, type } = events["messages.upsert"];
+      if (type !== "notify") return;
 
-                if (shouldReconnect) {
-                    startSock()
-                }
-            }
+      for (const msg of messages) {
+        const parsed = parseMessage(msg);
+        if (!parsed) continue;
 
-            if (connection === 'open') {
-                console.log('✅ WhatsApp conectado com sucesso!')
-            }
-        }
+        await dispatchEvent(sock, {
+          type: "MessageReceived",
+          text: parsed.text,
+          jid: parsed.jid,
+          sender: parsed.sender,
+          isGroup: parsed.isGroup,
+        });
+      }
+    }
+  });
 
-        // 📩 Mensagens recebidas
-        if (events['messages.upsert']) {
-            const { messages, type } = events['messages.upsert']
+  // 🔐 Pairing
+  if (!sock.authState.creds.registered) {
+    console.log("\n⚠️ Aparelho não registrado.");
 
-            if (type !== 'notify') return
+    await sleep(3000);
 
-            for (const msg of messages) {
-                const parsed = parseMessage(msg)
-                if (!parsed) continue
+    const phoneNumber = (process.env.WHATSAPP_PHONE_NUMBER || "").replace(
+      /\D/g,
+      "",
+    );
 
-                await dispatchEvent(sock, {
-                    type: 'MessageReceived',
-                    text: parsed.text,
-                    jid: parsed.jid,
-                    sender: parsed.sender,
-                    isGroup: parsed.isGroup,
-                })
-            }
-        }
-    })
-}
+    if (!phoneNumber) {
+      console.log("❌ WHATSAPP_PHONE_NUMBER não definido");
+      return;
+    }
 
-startSock()
+    try {
+      await sock.waitForSocketOpen();
+
+      const code = await sock.requestPairingCode(phoneNumber, undefined);
+
+      console.log(
+        `\n✅ CÓDIGO DE PAREAMENTO: ${code?.match(/.{1,4}/g)?.join("-")}`,
+      );
+
+      console.log(
+        "Vá em: Aparelhos Conectados > Conectar com número de telefone\n",
+      );
+    } catch (err) {
+      console.error("Erro no pairing:", err);
+      process.exit(1);
+    }
+  }
+};
+
+startSock();
