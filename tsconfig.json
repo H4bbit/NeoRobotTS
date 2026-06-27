@@ -1,32 +1,32 @@
 {
-    "compilerOptions": {
-        /* File layout */
-        "rootDir": "./src",
-        "outDir": "./dist",
+  "compilerOptions": {
+    /* File layout */
+    "rootDir": "./src",
+    "outDir": "./dist",
 
-        /* Environment / Module system */
-        "module": "nodenext",
-        "moduleResolution": "nodenext",
-        "target": "esnext",
-        "lib": ["esnext"],
-        "types": ["node"],
+    /* Environment / Module system */
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "target": "esnext",
+    "lib": ["esnext"],
+    "types": ["node"],
 
-        /* Output */
-        "sourceMap": false,
+    /* Output */
+    "sourceMap": false,
 
-        /* Type safety */
-        "strict": true,
-        "noUncheckedIndexedAccess": true,
-        "exactOptionalPropertyTypes": true,
+    /* Type safety */
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
 
-        /* Module & build correctness */
-        "verbatimModuleSyntax": true,
-        "isolatedModules": true,
-        "noUncheckedSideEffectImports": true,
-        "moduleDetection": "force",
+    /* Module & build correctness */
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "noUncheckedSideEffectImports": true,
+    "moduleDetection": "force",
 
-        /* Performance / DX */
-        "skipLibCheck": true
-    },
-    "include": ["src"]
+    /* Performance / DX */
+    "skipLibCheck": true
+  },
+  "include": ["src"]
 }

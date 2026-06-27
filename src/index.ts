@@ -87,13 +87,9 @@ const startSock = async () => {
       for (const msg of messages) {
         const parsed = parseMessage(msg);
         if (!parsed) continue;
-
         await dispatchEvent(sock, {
           type: "MessageReceived",
-          text: parsed.text,
-          jid: parsed.jid,
-          sender: parsed.sender,
-          isGroup: parsed.isGroup,
+          message: parsed,
         });
       }
     }

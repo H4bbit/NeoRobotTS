@@ -1,7 +1,6 @@
+import { proto } from "baileys";
+
 export type BotEvent = {
   type: "MessageReceived";
-  text: string;
-  jid: string;
-  sender: string;
-  isGroup: boolean;
+  message: proto.IWebMessageInfo;
 };

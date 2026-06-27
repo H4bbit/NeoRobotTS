@@ -3,38 +3,52 @@ import { type BotEvent } from "../events/types.js";
 import { logCommand } from "../events/logger.js";
 import { isGroupActive, setGroupActive } from "./db.js";
 import { getJidType } from "../utils/jid.js";
+import { getMessageText } from "../messages/text.js";
+import {
+  downloadStickerMedia,
+  getStickerMedia,
+  imageToSticker,
+  videoToSticker,
+} from "../utils/sticker.js";
 
 export async function commandController(
   sock: WASocket,
   event: BotEvent & { type: "MessageReceived" },
 ) {
-  const isCommand = event.text.startsWith("!");
+  const msg = event.message;
+
+  const jid = msg.key!.remoteJid!;
+  const isGroup = jid.endsWith("@g.us");
+
+  const text = getMessageText(msg);
+  const sender = msg.pushName ?? "Desconhecido";
+  const isCommand = text.startsWith("!");
   if (!isCommand) return;
 
-  const parts = event.text.slice(1).trim().split(/\s+/);
+  const parts = text.slice(1).trim().split(/\s+/);
   const command = parts[0];
 
   if (!command) return;
 
   logCommand({
     command,
-    jid: event.jid,
-    isGroup: event.isGroup,
-    sender: event.sender,
+    jid: jid,
+    isGroup: isGroup,
+    sender: sender,
   });
 
   const isActivationCommand = command === "boton" || command === "botoff";
 
-  const jidType = getJidType(event.jid);
+  const jidType = getJidType(jid);
 
   // aplica regra apenas para grupos reais
   if (jidType === "group") {
-    if (!isGroupActive(event.jid) && !isActivationCommand) return;
+    if (!isGroupActive(jid) && !isActivationCommand) return;
   }
 
   switch (command) {
     case "ping": {
-      await sock.sendMessage(event.jid, {
+      await sock.sendMessage(jid, {
         text: "Pong 🏓",
       });
       break;
@@ -42,8 +56,8 @@ export async function commandController(
 
     case "boton": {
       if (jidType === "group") {
-        setGroupActive(event.jid, true);
-        await sock.sendMessage(event.jid, {
+        setGroupActive(jid, true);
+        await sock.sendMessage(jid, {
           text: "✅ Bot ativado neste grupo",
         });
       }
@@ -52,14 +66,36 @@ export async function commandController(
 
     case "botoff": {
       if (jidType === "group") {
-        setGroupActive(event.jid, false);
-        await sock.sendMessage(event.jid, {
+        setGroupActive(jid, false);
+        await sock.sendMessage(jid, {
           text: "❌ Bot desativado neste grupo",
         });
       }
       break;
     }
+    case "sticker":
+    case "s": {
+      const media = getStickerMedia(msg);
 
+      if (!media) {
+        await sock.sendMessage(jid, {
+          text: "Marque ou responda uma imagem ou vídeo.",
+        });
+        break;
+      }
+      const input = await downloadStickerMedia(media);
+
+      const sticker =
+        media.type === "image"
+          ? await imageToSticker(input)
+          : await videoToSticker(input);
+
+      console.log(sticker.length);
+      await sock.sendMessage(jid, {
+        sticker,
+      });
+      break;
+    }
     default:
       break;
   }

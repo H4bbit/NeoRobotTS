@@ -2,7 +2,6 @@ NeoRobotTS 🤖
 
 Bot de WhatsApp escrito em TypeScript utilizando Baileys, com suporte a execução em ambiente Termux (Android).
 
-
 ---
 
 📌 Visão geral
@@ -10,7 +9,6 @@ Bot de WhatsApp escrito em TypeScript utilizando Baileys, com suporte a execuç�
 Este projeto implementa um bot de WhatsApp baseado em eventos usando a biblioteca Baileys, com persistência de sessão via better-sqlite3 e arquitetura modular em TypeScript.
 
 Ele foi desenvolvido e testado diretamente no Termux (Android ARM64), sem necessidade de PC.
-
 
 ---
 
@@ -28,8 +26,6 @@ SQLite embutido
 
 Termux toolchain (clang, make, python via node-gyp)
 
-
-
 ---
 
 🚨 Execução no Termux (IMPORTANTE)
@@ -44,8 +40,6 @@ sharp (em alguns casos)
 
 dependências de protobuf / crypto nativo
 
-
-
 ---
 
 ❌ Problema conhecido
@@ -55,7 +49,6 @@ Durante npm install, pode ocorrer erro como:
 gyp: Undefined variable android_ndk_path in binding.gyp
 
 ou falhas de build relacionadas ao Android toolchain.
-
 
 ---
 
@@ -75,14 +68,11 @@ Força uso do toolchain do Termux (clang/make/python)
 
 Permite compilação nativa direta no ambiente Android
 
-
-
 ---
 
 🧪 Setup completo (Termux)
 
 export GYP_DEFINES="android_ndk_path=''" npm install npm run build
-
 
 ---
 
@@ -90,13 +80,11 @@ export GYP_DEFINES="android_ndk_path=''" npm install npm run build
 
 npm start
 
-
 ---
 
 📦 Scripts disponíveis
 
 { "build": "tsc", "start": "node dist/index.js", "dev": "node --watch dist/index.js", "typecheck": "tsc --noEmit", "clean": "rm -rf dist" }
-
 
 ---
 
@@ -112,8 +100,6 @@ src/events/ → sistema de eventos
 
 dist/ → build final
 
-
-
 ---
 
 ⚠️ Observações importantes
@@ -121,7 +107,6 @@ dist/ → build final
 Persistência
 
 O bot usa SQLite via better-sqlite3 para armazenar credenciais do WhatsApp e manter login persistente.
-
 
 ---
 
@@ -135,8 +120,6 @@ comportamento do node-gyp varia entre versões
 
 upgrades de Node podem quebrar dependências
 
-
-
 ---
 
 Dependências nativas
@@ -147,14 +130,11 @@ protobuf
 
 sharp (dependendo do uso)
 
-
-
 ---
 
 🧪 Debug rápido
 
 rm -rf node_modules package-lock.json export GYP_DEFINES="android_ndk_path=''" npm install
-
 
 ---
 
@@ -167,8 +147,6 @@ Node 24.x
 Baileys 7.x RC
 
 ARM64
-
-
 
 ---
 
