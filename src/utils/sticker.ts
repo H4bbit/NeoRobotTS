@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import crypto from "node:crypto";
 import ffmpeg from "fluent-ffmpeg";
+import { addStickerMetadata } from "./metadataWebp.js";
 
 type ImageMessage = proto.Message.IImageMessage;
 type VideoMessage = proto.Message.IVideoMessage;
@@ -119,7 +120,14 @@ async function runFfmpeg(command: ffmpeg.FfmpegCommand): Promise<void> {
       .run();
   });
 }
-export async function imageToSticker(buffer: Buffer): Promise<Buffer> {
+
+const PACK_NAME = "🤖 NeoRobot\n⤷ bot by S3NP41";
+
+const AUTHOR_TEMPLATE = (sender: string) => `⚡ Feita por\n⤷ ⋅ ${sender}`;
+export async function imageToSticker(
+  buffer: Buffer,
+  author: string,
+): Promise<Buffer> {
   const temp = await createTempPaths("png");
 
   try {
@@ -129,12 +137,20 @@ export async function imageToSticker(buffer: Buffer): Promise<Buffer> {
         .outputOptions("-vf", "scale=512:512")
         .output(temp.output),
     );
-    return await fs.readFile(temp.output);
+    const sticker = await fs.readFile(temp.output);
+    return await addStickerMetadata(
+      sticker,
+      PACK_NAME,
+      AUTHOR_TEMPLATE(author),
+    );
   } finally {
     await cleanup(temp.dir);
   }
 }
-export async function videoToSticker(buffer: Buffer): Promise<Buffer> {
+export async function videoToSticker(
+  buffer: Buffer,
+  author: string,
+): Promise<Buffer> {
   const temp = await createTempPaths("mp4");
 
   try {
@@ -156,7 +172,12 @@ export async function videoToSticker(buffer: Buffer): Promise<Buffer> {
         .output(temp.output),
     );
 
-    return await fs.readFile(temp.output);
+    const sticker = await fs.readFile(temp.output);
+    return await addStickerMetadata(
+      sticker,
+      PACK_NAME,
+      AUTHOR_TEMPLATE(author),
+    );
   } finally {
     await cleanup(temp.dir);
   }

@@ -104,10 +104,9 @@ export async function commandController(
 
       const sticker =
         media.type === "image"
-          ? await imageToSticker(input)
-          : await videoToSticker(input);
+          ? await imageToSticker(input, sender)
+          : await videoToSticker(input, sender);
 
-      console.log(sticker.length);
       await sock.sendMessage(jid, {
         sticker,
       });
