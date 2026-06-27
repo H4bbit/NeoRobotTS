@@ -1,4 +1,5 @@
 import { type WASocket } from "baileys";
+import { type WAMessage } from "baileys";
 import { type BotEvent } from "../events/types.js";
 import { logCommand } from "../events/logger.js";
 import { isGroupActive, setGroupActive } from "./db.js";
@@ -6,11 +7,11 @@ import { getJidType } from "../utils/jid.js";
 import { getMessageText } from "../messages/text.js";
 import {
   downloadStickerMedia,
+  getStickerDuration,
   getStickerMedia,
   imageToSticker,
   videoToSticker,
 } from "../utils/sticker.js";
-
 export async function commandController(
   sock: WASocket,
   event: BotEvent & { type: "MessageReceived" },
@@ -82,6 +83,22 @@ export async function commandController(
           text: "Marque ou responda uma imagem ou vídeo.",
         });
         break;
+      }
+      if (media.type === "video") {
+        const seconds = getStickerDuration(msg);
+
+        if (seconds !== null && seconds > 10) {
+          await sock.sendMessage(
+            jid,
+            {
+              text: "O vídeo deve ter no máximo 10 segundos.",
+            },
+            {
+              quoted: msg as WAMessage,
+            },
+          );
+          break;
+        }
       }
       const input = await downloadStickerMedia(media);
 

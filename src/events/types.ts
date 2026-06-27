@@ -1,6 +1,6 @@
-import { proto } from "baileys";
+import { type ParsedMessage } from "../messages/types.js";
 
 export type BotEvent = {
   type: "MessageReceived";
-  message: proto.IWebMessageInfo;
+  message: ParsedMessage;
 };

@@ -60,7 +60,22 @@ export function getStickerMedia(
 
   return null;
 }
+export function getStickerDuration(msg: proto.IWebMessageInfo): number | null {
+  const message = msg.message;
+  if (!message) return null;
 
+  if (message.videoMessage) {
+    return message.videoMessage.seconds ?? null;
+  }
+
+  const quoted = message.extendedTextMessage?.contextInfo?.quotedMessage;
+
+  if (!quoted?.videoMessage) {
+    return null;
+  }
+
+  return quoted.videoMessage.seconds ?? null;
+}
 export async function downloadStickerMedia(
   media: StickerMedia,
 ): Promise<Buffer> {
