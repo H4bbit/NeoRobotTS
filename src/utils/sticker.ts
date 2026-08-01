@@ -9,6 +9,7 @@ import { addStickerMetadata } from "./metadataWebp.js";
 
 type ImageMessage = proto.Message.IImageMessage;
 type VideoMessage = proto.Message.IVideoMessage;
+type WebpStickerMessage = proto.Message.IStickerMessage;
 
 export type StickerMedia =
   | {
@@ -20,47 +21,52 @@ export type StickerMedia =
       message: VideoMessage;
     };
 
+export type WebpStickerMedia = {
+  type: "sticker";
+  message: WebpStickerMessage;
+};
+
+type DownloadableMedia = StickerMedia | WebpStickerMedia;
+
+function getDirectOrQuotedMessage(msg: proto.IWebMessageInfo): proto.IMessage | null {
+  const message = msg.message;
+
+  return message?.extendedTextMessage?.contextInfo?.quotedMessage ?? message ?? null;
+}
+
 export function getStickerMedia(
   msg: proto.IWebMessageInfo,
 ): StickerMedia | null {
-  const message = msg.message;
-  if (!message) return null;
+  const message = getDirectOrQuotedMessage(msg);
 
-  // mídia enviada junto com o comando
-  if (message.imageMessage) {
+  if (message?.imageMessage) {
     return {
       type: "image",
       message: message.imageMessage,
     };
   }
 
-  if (message.videoMessage) {
+  if (message?.videoMessage) {
     return {
       type: "video",
       message: message.videoMessage,
     };
   }
 
-  // mídia da mensagem respondida
-  const quoted = message.extendedTextMessage?.contextInfo?.quotedMessage;
-
-  if (!quoted) return null;
-
-  if (quoted.imageMessage) {
-    return {
-      type: "image",
-      message: quoted.imageMessage,
-    };
-  }
-
-  if (quoted.videoMessage) {
-    return {
-      type: "video",
-      message: quoted.videoMessage,
-    };
-  }
-
   return null;
+}
+
+export function getWebpStickerMedia(
+  msg: proto.IWebMessageInfo,
+): WebpStickerMedia | null {
+  const message = getDirectOrQuotedMessage(msg);
+
+  if (!message?.stickerMessage) return null;
+
+  return {
+    type: "sticker",
+    message: message.stickerMessage,
+  };
 }
 export function getStickerDuration(msg: proto.IWebMessageInfo): number | null {
   const message = msg.message;
@@ -79,7 +85,7 @@ export function getStickerDuration(msg: proto.IWebMessageInfo): number | null {
   return quoted.videoMessage.seconds ?? null;
 }
 export async function downloadStickerMedia(
-  media: StickerMedia,
+  media: DownloadableMedia,
 ): Promise<Buffer> {
   const stream = await downloadContentFromMessage(media.message, media.type);
 

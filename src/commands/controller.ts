@@ -5,9 +5,11 @@ import { isGroupActive, setGroupActive } from "./db.js";
 import { getJidType } from "../utils/jid.js";
 import { getMessageText } from "../messages/text.js";
 import {
+    animatedWebpToVideo,
     downloadStickerMedia,
     getStickerDuration,
     getStickerMedia,
+    getWebpStickerMedia,
     imageToSticker,
     videoToSticker,
 } from "../utils/sticker.js";
@@ -86,6 +88,50 @@ export async function commandController(
                     {
                         quoted: msg,
                     }
+                );
+            }
+            break;
+        }
+        case "tovideo": {
+            const media = getWebpStickerMedia(msg);
+
+            if (!media) {
+                await sendReaction(sock, msg, "❓");
+                await sock.sendMessage(jid, {
+                    text: "Marque ou responda um sticker.",
+                },
+                    {
+                        quoted: msg,
+                    }
+                );
+                break;
+            }
+
+            try {
+                const input = await downloadStickerMedia(media);
+                const video = await animatedWebpToVideo(input);
+
+                await sock.sendMessage(jid, {
+                    video,
+                    mimetype: "video/mp4",
+                },
+                    {
+                        quoted: msg,
+                    },
+                );
+                await sendReaction(sock, msg, "✅");
+            } catch (error) {
+                const text = error instanceof Error
+                    ? error.message
+                    : "Não foi possível converter o sticker.";
+
+                await sendReaction(sock, msg, "⚠️");
+                await sock.sendMessage(jid, {
+                    text,
+                },
+                    {
+                        quoted: msg,
+                    },
                 );
             }
             break;
