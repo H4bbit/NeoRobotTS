@@ -119,14 +119,38 @@ async function cleanup(dir: string) {
   });
 }
 
-async function runFfmpeg(command: ffmpeg.FfmpegCommand): Promise<void> {
+async function runFfmpeg(
+  command: ffmpeg.FfmpegCommand,
+  timeoutMs?: number,
+): Promise<void> {
   await new Promise<void>((resolve, reject) => {
+    let timer: NodeJS.Timeout | null = null;
+
+    if (timeoutMs !== undefined) {
+      timer = setTimeout(() => {
+        command.kill("SIGKILL");
+        reject(new Error("Tempo limite excedido ao processar mídia."));
+      }, timeoutMs);
+    }
+
     command
-      .on("end", () => resolve())
-      .on("error", reject)
+      .on("end", () => {
+        if (timer) clearTimeout(timer);
+        resolve();
+      })
+      .on("error", (error) => {
+        if (timer) clearTimeout(timer);
+        reject(error);
+      })
       .run();
   });
 }
+
+const WEBP_MAX_FILE_SIZE = 1024 * 1024 * 2;
+const WEBP_MAX_FRAMES = 120;
+const WEBP_MAX_DIMENSION = 1024;
+const WEBP_MAX_DURATION_MS = 15000;
+const PROCESS_TIMEOUT_MS = 15000;
 
 export type AnimatedWebpFrameInfo = {
   index: number;
@@ -150,7 +174,7 @@ export type AnimatedWebpInfo = {
 
 async function runWebpmux(args: string[]): Promise<string> {
   return await new Promise<string>((resolve, reject) => {
-    execFile("webpmux", args, (error, stdout, stderr) => {
+    execFile("webpmux", args, { timeout: PROCESS_TIMEOUT_MS }, (error, stdout, stderr) => {
       const output = `${stdout}${stderr}`;
 
       if (error) {
@@ -243,6 +267,32 @@ export async function inspectAnimatedWebp(input: string): Promise<AnimatedWebpIn
   return parseWebpmuxInfo(output);
 }
 
+function validateWebpForVideo(info: AnimatedWebpInfo, size: number) {
+  if (size > WEBP_MAX_FILE_SIZE) {
+    throw new Error("O sticker é grande demais para converter.");
+  }
+
+  if (info.canvasWidth <= 0 || info.canvasHeight <= 0) {
+    throw new Error("Sticker WebP inválido.");
+  }
+
+  if (info.canvasWidth > WEBP_MAX_DIMENSION || info.canvasHeight > WEBP_MAX_DIMENSION) {
+    throw new Error("As dimensões do sticker são grandes demais.");
+  }
+
+  if (info.frameCount <= 0) {
+    throw new Error("O sticker não possui frames para converter.");
+  }
+
+  if (info.frameCount > WEBP_MAX_FRAMES) {
+    throw new Error("O sticker possui frames demais para converter.");
+  }
+
+  if (info.duration > WEBP_MAX_DURATION_MS) {
+    throw new Error("A duração do sticker é grande demais para converter.");
+  }
+}
+
 export async function extractAnimatedWebpFrames(
   input: string,
   outputDir: string,
@@ -301,6 +351,9 @@ export async function animatedWebpToVideo(buffer: Buffer): Promise<Buffer> {
     await fs.writeFile(temp.input, buffer);
 
     const info = await inspectAnimatedWebp(temp.input);
+
+    validateWebpForVideo(info, buffer.length);
+
     const frames = await extractAnimatedWebpFrames(temp.input, framesDir, info.frameCount);
 
     if (frames.length === 0) {
@@ -323,6 +376,7 @@ export async function animatedWebpToVideo(buffer: Buffer): Promise<Buffer> {
           "yuv420p",
         )
         .output(output),
+      PROCESS_TIMEOUT_MS,
     );
 
     return await fs.readFile(output);
