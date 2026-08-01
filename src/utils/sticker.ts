@@ -3,6 +3,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import crypto from "node:crypto";
+import { execFile } from "node:child_process";
 import ffmpeg from "fluent-ffmpeg";
 import { addStickerMetadata } from "./metadataWebp.js";
 
@@ -119,6 +120,121 @@ async function runFfmpeg(command: ffmpeg.FfmpegCommand): Promise<void> {
       .on("error", reject)
       .run();
   });
+}
+
+export type AnimatedWebpFrameInfo = {
+  index: number;
+  width: number;
+  height: number;
+  duration: number;
+  compression: string | null;
+  hasAlpha: boolean;
+};
+
+export type AnimatedWebpInfo = {
+  canvasWidth: number;
+  canvasHeight: number;
+  frameCount: number;
+  loopCount: number | null;
+  frames: AnimatedWebpFrameInfo[];
+  compression: string | null;
+  hasAlpha: boolean;
+  duration: number;
+};
+
+async function runWebpmux(args: string[]): Promise<string> {
+  return await new Promise<string>((resolve, reject) => {
+    execFile("webpmux", args, (error, stdout, stderr) => {
+      const output = `${stdout}${stderr}`;
+
+      if (error) {
+        reject(new Error(output.trim() || error.message));
+        return;
+      }
+
+      resolve(output);
+    });
+  });
+}
+
+function parseNumber(value: string | undefined): number | null {
+  if (value === undefined) return null;
+
+  const number = Number.parseInt(value, 10);
+
+  return Number.isFinite(number) ? number : null;
+}
+
+function findHeaderIndex(headers: string[], name: string, fallback: number): number {
+  const index = headers.findIndex((header) => header.toLowerCase() === name);
+
+  return index >= 0 ? index : fallback;
+}
+
+function parseWebpmuxInfo(output: string): AnimatedWebpInfo {
+  const canvasMatch = output.match(/Canvas\s+size:\s*(\d+)\s*x\s*(\d+)/i)
+    ?? output.match(/Canvas[^\n]*?:\s*(\d+)\s*x\s*(\d+)/i);
+  const frameCountMatch = output.match(/Number\s+of\s+frames:\s*(\d+)/i);
+  const loopCountMatch = output.match(/Loop\s+Count:\s*(\d+)/i);
+  const lines = output.split(/\r?\n/);
+  const headerLine = lines.find((line) => /^\s*No\.:/i.test(line));
+  const headers = headerLine
+    ?.replace(/^\s*No\.:\s*/i, "")
+    .trim()
+    .split(/\s+/) ?? [];
+  const widthIndex = findHeaderIndex(headers, "width", 0);
+  const heightIndex = findHeaderIndex(headers, "height", 1);
+  const alphaIndex = findHeaderIndex(headers, "alpha", 2);
+  const durationIndex = findHeaderIndex(headers, "duration", 5);
+  const compressionIndex = findHeaderIndex(headers, "compression", 9);
+  const frames: AnimatedWebpFrameInfo[] = [];
+
+  for (const line of lines) {
+    const frameMatch = line.match(/^\s*(\d+)\s*:\s*(.+)$/);
+
+    if (!frameMatch) continue;
+
+    const columns = frameMatch[2]?.trim().split(/\s+/) ?? [];
+    const width = parseNumber(columns[widthIndex]);
+    const height = parseNumber(columns[heightIndex]);
+    const duration = parseNumber(columns[durationIndex]);
+
+    if (width === null || height === null || duration === null) continue;
+
+    frames.push({
+      index: Number.parseInt(frameMatch[1]!, 10),
+      width,
+      height,
+      duration,
+      compression: columns[compressionIndex] ?? null,
+      hasAlpha: /yes|true|1/i.test(columns[alphaIndex] ?? ""),
+    });
+  }
+
+  const canvasWidth = parseNumber(canvasMatch?.[1]) ?? frames[0]?.width ?? 0;
+  const canvasHeight = parseNumber(canvasMatch?.[2]) ?? frames[0]?.height ?? 0;
+  const frameCount = parseNumber(frameCountMatch?.[1]) ?? frames.length;
+  const compression = frames[0]?.compression ?? null;
+  const hasAlpha = frames.some((frame) => frame.hasAlpha)
+    || /Features[^\n]*Alpha/i.test(output)
+    || /Features[^\n]*transparency/i.test(output);
+
+  return {
+    canvasWidth,
+    canvasHeight,
+    frameCount,
+    loopCount: parseNumber(loopCountMatch?.[1]),
+    frames,
+    compression,
+    hasAlpha,
+    duration: frames.reduce((total, frame) => total + frame.duration, 0),
+  };
+}
+
+export async function inspectAnimatedWebp(input: string): Promise<AnimatedWebpInfo> {
+  const output = await runWebpmux(["-info", input]);
+
+  return parseWebpmuxInfo(output);
 }
 
 const PACK_NAME = "🤖 NeoRobot\n⤷ bot by S3NP41";
