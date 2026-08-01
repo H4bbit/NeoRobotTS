@@ -237,6 +237,30 @@ export async function inspectAnimatedWebp(input: string): Promise<AnimatedWebpIn
   return parseWebpmuxInfo(output);
 }
 
+export async function extractAnimatedWebpFrames(
+  input: string,
+  outputDir: string,
+  frameCount: number,
+): Promise<string[]> {
+  await fs.mkdir(outputDir, { recursive: true });
+
+  const frames: string[] = [];
+
+  for (let index = 1; index <= frameCount; index += 1) {
+    const output = path.join(outputDir, `frame-${String(index).padStart(6, "0")}.webp`);
+
+    try {
+      await runWebpmux(["-get", "frame", String(index), input, "-o", output]);
+      frames.push(output);
+    } catch (error) {
+      await fs.rm(output, { force: true });
+      throw error;
+    }
+  }
+
+  return frames;
+}
+
 const PACK_NAME = "🤖 NeoRobot\n⤷ bot by S3NP41";
 
 const AUTHOR_TEMPLATE = (sender: string) => `⚡ Feita por\n⤷ ⋅ ${sender}`;
