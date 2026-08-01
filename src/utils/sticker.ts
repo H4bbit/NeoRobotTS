@@ -261,6 +261,70 @@ export async function extractAnimatedWebpFrames(
   return frames;
 }
 
+function escapeConcatPath(file: string): string {
+  return file.replace(/'/g, "'\\''");
+}
+
+async function writeConcatFile(
+  file: string,
+  frames: string[],
+  info: AnimatedWebpInfo,
+) {
+  const lines: string[] = [];
+
+  for (let index = 0; index < frames.length; index += 1) {
+    const frame = frames[index]!;
+    const duration = (info.frames[index]?.duration ?? 100) / 1000;
+
+    lines.push(`file '${escapeConcatPath(frame)}'`);
+    lines.push(`duration ${duration.toFixed(3)}`);
+  }
+
+  lines.push(`file '${escapeConcatPath(frames[frames.length - 1]!)}'`);
+
+  await fs.writeFile(file, `${lines.join("\n")}\n`);
+}
+
+export async function animatedWebpToVideo(buffer: Buffer): Promise<Buffer> {
+  const temp = await createTempPaths("webp");
+  const framesDir = path.join(temp.dir, "frames");
+  const concatFile = path.join(temp.dir, "frames.txt");
+  const output = path.join(temp.dir, `${crypto.randomUUID()}.mp4`);
+
+  try {
+    await fs.writeFile(temp.input, buffer);
+
+    const info = await inspectAnimatedWebp(temp.input);
+    const frames = await extractAnimatedWebpFrames(temp.input, framesDir, info.frameCount);
+
+    if (frames.length === 0) {
+      throw new Error("O sticker não possui frames para converter.");
+    }
+
+    await writeConcatFile(concatFile, frames, info);
+
+    await runFfmpeg(
+      ffmpeg()
+        .input(concatFile)
+        .inputOptions("-f", "concat", "-safe", "0")
+        .outputOptions(
+          "-y",
+          "-vf",
+          "fps=30,format=yuv420p",
+          "-movflags",
+          "+faststart",
+          "-pix_fmt",
+          "yuv420p",
+        )
+        .output(output),
+    );
+
+    return await fs.readFile(output);
+  } finally {
+    await cleanup(temp.dir);
+  }
+}
+
 const PACK_NAME = "🤖 NeoRobot\n⤷ bot by S3NP41";
 
 const AUTHOR_TEMPLATE = (sender: string) => `⚡ Feita por\n⤷ ⋅ ${sender}`;
