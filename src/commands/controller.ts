@@ -5,6 +5,7 @@ import { isGroupActive, setGroupActive } from "./db.js";
 import { getJidType } from "../utils/jid.js";
 import { getMessageText } from "../messages/text.js";
 import {
+    StickerConversionError,
     animatedWebpToVideo,
     downloadStickerMedia,
     getStickerDuration,
@@ -121,9 +122,9 @@ export async function commandController(
                 );
                 await sendReaction(sock, msg, "✅");
             } catch (error) {
-                const text = error instanceof Error
+                const text = error instanceof StickerConversionError
                     ? error.message
-                    : "Não foi possível converter o sticker.";
+                    : "Não foi possível converter o sticker em vídeo.";
 
                 await sendReaction(sock, msg, "⚠️");
                 await sock.sendMessage(jid, {
