@@ -1,159 +1,118 @@
-NeoRobotTS 🤖
+# NeoRobotTS 🤖
 
-Bot de WhatsApp escrito em TypeScript utilizando Baileys, com suporte a execução em ambiente Termux (Android).
+Bot de WhatsApp escrito em **TypeScript** utilizando **Baileys**, com arquitetura modular e persistência local em SQLite.
 
----
+O projeto é desenvolvido principalmente no **Termux (Android)**, mas pode ser executado em qualquer ambiente compatível com Node.js.
 
-📌 Visão geral
+## ✨ Recursos
 
-Este projeto implementa um bot de WhatsApp baseado em eventos usando a biblioteca Baileys, com persistência de sessão via better-sqlite3 e arquitetura modular em TypeScript.
+- Arquitetura baseada em eventos
+- Sistema modular de comandos
+- Persistência de autenticação utilizando SQLite
+- Conversão e manipulação de mídia
+- Compatível com Termux
+- Escrito em TypeScript utilizando ES Modules
 
-Ele foi desenvolvido e testado diretamente no Termux (Android ARM64), sem necessidade de PC.
+## 🛠️ Stack
 
----
+- Node.js 24+
+- TypeScript
+- Baileys
+- better-sqlite3
+- SQLite
 
-⚙️ Stack
+## 📦 Instalação
 
-Node.js (>= 24.x recomendado no Termux)
+Instale as dependências:
 
-TypeScript
+```sh
+npm install
+```
 
-Baileys (WhatsApp Web API)
+Compile o projeto:
 
-better-sqlite3 (persistência local)
+```sh
+npm run build
+```
 
-SQLite embutido
+## ▶️ Executando
 
-Termux toolchain (clang, make, python via node-gyp)
+```sh
+npm start
+```
 
----
+## 📁 Estrutura do projeto
 
-🚨 Execução no Termux (IMPORTANTE)
+```text
+src/
+├── auth/        # Persistência e autenticação
+├── commands/    # Sistema de comandos
+├── events/      # Dispatcher e logger
+├── messages/    # Processamento de mensagens
+├── types/       # Declarações de tipos
+├── utils/       # Utilitários
+└── index.ts     # Entrypoint
+```
 
-No Termux, algumas dependências nativas não conseguem detectar corretamente o Android NDK.
+## 📜 Scripts
 
-Isso afeta principalmente o node-gyp, usado por pacotes como:
+| Script | Descrição |
+|--------|-----------|
+| `npm run build` | Compila o projeto |
+| `npm start` | Executa o bot |
+| `npm run dev` | Executa em modo watch |
+| `npm run typecheck` | Verifica os tipos sem gerar arquivos |
+| `npm run clean` | Remove o diretório `dist` |
+| `npm test` | Placeholder para futuros testes |
 
-better-sqlite3
+## 🔧 Desenvolvimento
 
-sharp (em alguns casos)
+### Ambiente utilizado
 
-dependências de protobuf / crypto nativo
+O projeto é desenvolvido e testado utilizando:
 
----
+- Termux
+- Node.js 24.x
+- TypeScript 5.x
+- Baileys 7.x RC
 
-❌ Problema conhecido
+### Dependências nativas
 
-Durante npm install, pode ocorrer erro como:
+Este projeto utiliza **better-sqlite3**, que possui código nativo compilado durante a instalação.
 
-gyp: Undefined variable android_ndk_path in binding.gyp
+### Termux
 
-ou falhas de build relacionadas ao Android toolchain.
+> [!IMPORTANT]
+> Antes de executar `npm install` no Termux, defina a seguinte variável de ambiente:
 
----
+```sh
+export GYP_DEFINES="android_ndk_path=''"
+```
 
-✅ Solução aplicada neste projeto
+Essa configuração evita que o `node-gyp` tente localizar um Android NDK e faz com que a compilação utilize o toolchain fornecido pelo próprio Termux.
 
-Para garantir que o build funcione no Termux, é necessário definir:
+Instalação completa:
+
+```sh
+export GYP_DEFINES="android_ndk_path=''"
+npm install
+npm run build
+```
+
+> [!TIP]
+> Caso a instalação falhe, remova as dependências e tente novamente.
+
+```sh
+rm -rf node_modules package-lock.json
 
 export GYP_DEFINES="android_ndk_path=''"
 
-O que isso faz
+npm install
+```
 
-Remove a necessidade de um Android NDK real
+> [!CAUTION]
+> Atualizações do Node.js podem exigir a recompilação das dependências nativas.
 
-Evita que o node-gyp tente resolver toolchains de APK build
+## 📄 Licença
 
-Força uso do toolchain do Termux (clang/make/python)
-
-Permite compilação nativa direta no ambiente Android
-
----
-
-🧪 Setup completo (Termux)
-
-export GYP_DEFINES="android_ndk_path=''" npm install npm run build
-
----
-
-▶️ Rodando o bot
-
-npm start
-
----
-
-📦 Scripts disponíveis
-
-{ "build": "tsc", "start": "node dist/index.js", "dev": "node --watch dist/index.js", "typecheck": "tsc --noEmit", "clean": "rm -rf dist" }
-
----
-
-🧠 Arquitetura
-
-src/index.ts → entrypoint do bot
-
-src/auth/ → persistência SQLite
-
-src/messages/ → parsing de mensagens
-
-src/events/ → sistema de eventos
-
-dist/ → build final
-
----
-
-⚠️ Observações importantes
-
-Persistência
-
-O bot usa SQLite via better-sqlite3 para armazenar credenciais do WhatsApp e manter login persistente.
-
----
-
-Ambiente Android
-
-Rodando em Termux (runtime não oficial Node.js), então:
-
-builds nativos podem falhar sem ajustes
-
-comportamento do node-gyp varia entre versões
-
-upgrades de Node podem quebrar dependências
-
----
-
-Dependências nativas
-
-better-sqlite3 (C++)
-
-protobuf
-
-sharp (dependendo do uso)
-
----
-
-🧪 Debug rápido
-
-rm -rf node_modules package-lock.json export GYP_DEFINES="android_ndk_path=''" npm install
-
----
-
-📌 Compatibilidade testada
-
-Termux Android 11+
-
-Node 24.x
-
-Baileys 7.x RC
-
-ARM64
-
----
-
-🚧 Limitações
-
-Sem suporte a NDK real (não necessário)
-
-Dependente do toolchain do Termux
-
-Quebras possíveis em upgrades de Node
+ISC
