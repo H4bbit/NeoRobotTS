@@ -107,7 +107,7 @@ src/
 
 ## 📊 Logs
 
-Logger centralizado em `src/utils/logger.ts` com `pino`:
+Logger centralizado em `src/utils/logger.ts` com `pino` (saída em `stdout` JSON):
 
 - `module: command` → `command_event` (comando, jid, sender, runtime)
 - `module: db` → `db_event` (READ_GROUP, SET_GROUP_ACTIVE)
@@ -115,11 +115,13 @@ Logger centralizado em `src/utils/logger.ts` com `pino`:
 - `module: sticker` → `sticker_event` (image/video_start/success)
 - `module: command` + `admin_event` → `ban/promote/demote/open/close`
 
-Filtre com `grep`:
+Para salvar em arquivo durante debug, redirecione a saída:
 
 ```sh
-cat bot.log | grep 'module.*webp'
-cat bot.log | grep 'admin_event'
+npm start 2>&1 | tee bot.log
+# depois filtre:
+grep 'module.*webp' bot.log
+grep 'admin_event' bot.log
 ```
 
 ## 📜 Scripts
