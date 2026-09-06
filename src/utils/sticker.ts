@@ -557,6 +557,29 @@ export async function animatedWebpToVideo(buffer: Buffer): Promise<Buffer> {
   }
 }
 
+export async function webpToImage(buffer: Buffer): Promise<Buffer> {
+  const startMs = Date.now();
+  logger.info({ type: "webp_conversion_event", event: "toimg_start", fileSize: buffer.length }, "webp to image started");
+  if (!isWebpBuffer(buffer)) {
+    throw new StickerConversionError("Envie um sticker WebP válido para converter.", "invalid_webp_file", "validate_input");
+  }
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "neorobot-"));
+  const input = path.join(dir, `${crypto.randomUUID()}.webp`);
+  const output = path.join(dir, `${crypto.randomUUID()}.png`);
+  try {
+    await fs.writeFile(input, buffer);
+    await runFfmpeg(ffmpeg(input).outputOptions("-y").output(output), PROCESS_TIMEOUT_MS);
+    const image = await fs.readFile(output);
+    logger.info({ type: "webp_conversion_event", event: "toimg_success", fileSize: buffer.length, outputSize: image.length, durationMs: Date.now() - startMs }, "webp to image succeeded");
+    return image;
+  } catch (error) {
+    logWebpConversionFailure("encode_video", error);
+    throw new StickerConversionError("Não foi possível converter o sticker em imagem.", "webp_to_image_failed", "encode_video");
+  } finally {
+    await cleanup(dir);
+  }
+}
+
 const PACK_NAME = "🤖 NeoRobot\n⤷ bot by S3NP41";
 
 const AUTHOR_TEMPLATE = (sender: string) => `⚡ Feita por\n⤷ ⋅ ${sender}`;
