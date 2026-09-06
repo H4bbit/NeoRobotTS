@@ -5,13 +5,17 @@ import { isGroupActive, setGroupActive } from "./db.js";
 import { getJidType } from "../utils/jid.js";
 import { getMessageText } from "../messages/text.js";
 import {
+    StickerConversionError,
+    animatedWebpToVideo,
     downloadStickerMedia,
     getStickerDuration,
     getStickerMedia,
+    getWebpStickerMedia,
     imageToSticker,
     videoToSticker,
 } from "../utils/sticker.js";
 import { sendReaction } from "../messages/react.js";
+import { commandLogger } from "../utils/logger.js";
 
 export async function commandController(
     sock: WASocket,
@@ -90,6 +94,52 @@ export async function commandController(
             }
             break;
         }
+        case "tovideo": {
+            const media = getWebpStickerMedia(msg);
+
+            if (!media) {
+                await sendReaction(sock, msg, "❓");
+                await sock.sendMessage(jid, {
+                    text: "Marque ou responda um sticker.",
+                },
+                    {
+                        quoted: msg,
+                    }
+                );
+                break;
+            }
+
+            try {
+                const input = await downloadStickerMedia(media);
+                commandLogger.info({ type: "command_event", command: "tovideo", jid, stage: "downloaded", inputSize: input.length }, "tovideo downloaded");
+                const video = await animatedWebpToVideo(input);
+
+                await sock.sendMessage(jid, {
+                    video,
+                    mimetype: "video/mp4",
+                },
+                    {
+                        quoted: msg,
+                    },
+                );
+                await sendReaction(sock, msg, "✅");
+                commandLogger.info({ type: "command_event", command: "tovideo", jid, outputSize: video.length }, "tovideo succeeded");
+            } catch (error) {
+                const text = error instanceof StickerConversionError
+                    ? error.message
+                    : "Não foi possível converter o sticker em vídeo.";
+
+                await sendReaction(sock, msg, "⚠️");
+                await sock.sendMessage(jid, {
+                    text,
+                },
+                    {
+                        quoted: msg,
+                    },
+                );
+            }
+            break;
+        }
         case "sticker":
         case "s": {
             const media = getStickerMedia(msg);
@@ -123,7 +173,7 @@ export async function commandController(
                 }
             }
             const input = await downloadStickerMedia(media);
-
+            commandLogger.info({ type: "command_event", command: "sticker", jid, mediaType: media.type, inputSize: input.length }, "sticker downloaded");
             const sticker =
                 media.type === "image"
                     ? await imageToSticker(input, sender)

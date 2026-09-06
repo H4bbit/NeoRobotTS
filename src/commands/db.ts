@@ -1,9 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import Database from "better-sqlite3";
-import P from "pino";
-
-const logger = P({ level: "info" });
+import { dbLogger as logger } from "../utils/logger.js";
 
 const dbPath = "./data/commands.sqlite";
 const dbDir = path.dirname(dbPath);
@@ -36,7 +34,7 @@ export function isGroupActive(jid: string): boolean {
       value,
       timestamp: Date.now(),
     },
-    "db mutation",
+    "db read",
   );
 
   return value;
@@ -55,7 +53,7 @@ export function setGroupActive(jid: string, active: boolean): void {
       value: active,
       timestamp: Date.now(),
     },
-    "db mutation",
+    "db write",
   );
 }
 
@@ -69,6 +67,6 @@ export function removeGroup(jid: string): void {
       jid,
       timestamp: Date.now(),
     },
-    "db mutation",
+    "db delete",
   );
 }
