@@ -17,7 +17,7 @@ import {
 } from "../utils/sticker.js";
 import { sendReaction } from "../messages/react.js";
 import { commandLogger } from "../utils/logger.js";
-import { debugMessageContext, getTargetJid, isBotAdmin, isParticipantAdmin } from "../utils/admin.js";
+import { debugMessageContext, getParticipantRole, getTargetJid, isBotAdmin, isBotJid, isParticipantAdmin } from "../utils/admin.js";
 
 export async function commandController(
     sock: WASocket,
@@ -221,14 +221,14 @@ export async function commandController(
                 break;
             }
             const senderJid = msg.key.participant ?? msg.key.remoteJid!;
-            const targetJid = getTargetJid(msg);
+            const targetJid = await getTargetJid(sock, jid, msg);
             commandLogger.info({ type: "admin_event", action: "promote_attempt", jid, senderJid, targetJid, debug: debugMessageContext(msg) }, "promote attempt");
-            if (!targetJid) {
-                await sendReaction(sock, msg, "❓");
-                await sock.sendMessage(jid, { text: "Marque ou responda alguém para promover. Ex: !promote @usuario" }, { quoted: msg });
+            if (targetJid && isBotJid(sock, targetJid)) {
+                await sendReaction(sock, msg, "❌");
+                await sock.sendMessage(jid, { text: "❌ Não posso me promover." }, { quoted: msg });
                 break;
             }
-            if (!await isParticipantAdmin(sock, jid, senderJid)) {
+            if (!targetJid) {
                 await sendReaction(sock, msg, "❌");
                 await sock.sendMessage(jid, { text: "❌ Você precisa ser admin para usar este comando." }, { quoted: msg });
                 break;
@@ -238,15 +238,32 @@ export async function commandController(
                 await sock.sendMessage(jid, { text: "❌ Eu preciso ser admin para promover." }, { quoted: msg });
                 break;
             }
+            const targetRole = await getParticipantRole(sock, jid, targetJid);
+            if (targetRole === "superadmin") {
+                await sendReaction(sock, msg, "⚠️");
+                await sock.sendMessage(jid, { text: "⚠️ Não é possível promover/rebaixar o criador do grupo." }, { quoted: msg });
+                break;
+            }
+            if (targetRole === "admin") {
+                await sendReaction(sock, msg, "ℹ️");
+                await sock.sendMessage(jid, { text: "ℹ️ Usuário já é admin." }, { quoted: msg });
+                break;
+            }
             try {
                 await sock.groupParticipantsUpdate(jid, [targetJid], "promote");
                 await sendReaction(sock, msg, "✅");
                 await sock.sendMessage(jid, { text: "✅ Usuário promovido a admin" }, { quoted: msg });
                 commandLogger.info({ type: "admin_event", action: "promote", jid, targetJid, senderJid }, "promote succeeded");
             } catch (error) {
-                commandLogger.error({ type: "admin_event", action: "promote_failed", jid, targetJid, error }, "promote failed");
-                await sendReaction(sock, msg, "⚠️");
-                await sock.sendMessage(jid, { text: "Não foi possível promover." }, { quoted: msg });
+                const isCreator = (error as unknown as { data?: number })?.data === 403;
+                if (isCreator) {
+                    await sendReaction(sock, msg, "⚠️");
+                    await sock.sendMessage(jid, { text: "⚠️ Não é possível alterar o criador do grupo." }, { quoted: msg });
+                } else {
+                    commandLogger.error({ type: "admin_event", action: "promote_failed", jid, targetJid, error }, "promote failed");
+                    await sendReaction(sock, msg, "⚠️");
+                    await sock.sendMessage(jid, { text: "Não foi possível promover." }, { quoted: msg });
+                }
             }
             break;
         }
@@ -259,11 +276,14 @@ export async function commandController(
                 break;
             }
             const senderJid = msg.key.participant ?? msg.key.remoteJid!;
-            const targetJid = getTargetJid(msg);
+            const targetJid = await getTargetJid(sock, jid, msg);
             commandLogger.info({ type: "admin_event", action: "demote_attempt", jid, senderJid, targetJid, debug: debugMessageContext(msg) }, "demote attempt");
+            if (targetJid && isBotJid(sock, targetJid)) {
+                await sendReaction(sock, msg, "❌");
+                await sock.sendMessage(jid, { text: "❌ Não posso me rebaixar." }, { quoted: msg });
+                break;
+            }
             if (!targetJid) {
-                await sendReaction(sock, msg, "❓");
-                await sock.sendMessage(jid, { text: "Marque ou responda alguém para rebaixar. Ex: !demote @usuario" }, { quoted: msg });
                 break;
             }
             if (!await isParticipantAdmin(sock, jid, senderJid)) {
@@ -276,15 +296,32 @@ export async function commandController(
                 await sock.sendMessage(jid, { text: "❌ Eu preciso ser admin para rebaixar." }, { quoted: msg });
                 break;
             }
+            const targetRoleDemote = await getParticipantRole(sock, jid, targetJid);
+            if (targetRoleDemote === "superadmin") {
+                await sendReaction(sock, msg, "⚠️");
+                await sock.sendMessage(jid, { text: "⚠️ Não é possível promover/rebaixar o criador do grupo." }, { quoted: msg });
+                break;
+            }
+            if (targetRoleDemote === null) {
+                await sendReaction(sock, msg, "ℹ️");
+                await sock.sendMessage(jid, { text: "ℹ️ Usuário já não é admin." }, { quoted: msg });
+                break;
+            }
             try {
                 await sock.groupParticipantsUpdate(jid, [targetJid], "demote");
                 await sendReaction(sock, msg, "✅");
                 await sock.sendMessage(jid, { text: "✅ Usuário rebaixado" }, { quoted: msg });
                 commandLogger.info({ type: "admin_event", action: "demote", jid, targetJid, senderJid }, "demote succeeded");
             } catch (error) {
-                commandLogger.error({ type: "admin_event", action: "demote_failed", jid, targetJid, error }, "demote failed");
-                await sendReaction(sock, msg, "⚠️");
-                await sock.sendMessage(jid, { text: "Não foi possível rebaixar." }, { quoted: msg });
+                const isCreator = (error as unknown as { data?: number })?.data === 403;
+                if (isCreator) {
+                    await sendReaction(sock, msg, "⚠️");
+                    await sock.sendMessage(jid, { text: "⚠️ Não é possível alterar o criador do grupo." }, { quoted: msg });
+                } else {
+                    commandLogger.error({ type: "admin_event", action: "demote_failed", jid, targetJid, error }, "demote failed");
+                    await sendReaction(sock, msg, "⚠️");
+                    await sock.sendMessage(jid, { text: "Não foi possível rebaixar." }, { quoted: msg });
+                }
             }
             break;
         }
@@ -357,8 +394,13 @@ export async function commandController(
                 break;
             }
             const senderJid = msg.key.participant ?? msg.key.remoteJid!;
-            const targetJid = getTargetJid(msg);
+            const targetJid = await getTargetJid(sock, jid, msg);
             commandLogger.info({ type: "admin_event", action: "ban_attempt", jid, senderJid, targetJid, debug: debugMessageContext(msg) }, "ban attempt");
+            if (targetJid && isBotJid(sock, targetJid)) {
+                await sendReaction(sock, msg, "❌");
+                await sock.sendMessage(jid, { text: "❌ Não posso me banir." }, { quoted: msg });
+                break;
+            }
             if (!targetJid) {
                 await sendReaction(sock, msg, "❓");
                 await sock.sendMessage(jid, { text: "Marque ou responda alguém para banir. Ex: !ban @usuario" }, { quoted: msg });

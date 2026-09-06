@@ -1,15 +1,22 @@
 import { type WASocket } from "baileys";
 import { commandLogger } from "./logger.js";
 
-function normalizeJid(jid: string): string {
+export function normalizeJid(jid: string): string {
   return jid.split(":")[0]!.split("@")[0]!;
 }
 
-export async function isParticipantAdmin(
+export function isBotJid(sock: WASocket, targetJid: string): boolean {
+  const botJid = sock.user?.id;
+  const botLid = (sock.user as unknown as { lid?: string })?.lid;
+  const targetNorm = normalizeJid(targetJid);
+  return [botJid, botLid].filter(Boolean).some((b) => normalizeJid(b as string) === targetNorm);
+}
+
+export async function getParticipantRole(
   sock: WASocket,
   groupJid: string,
   participantJid: string,
-): Promise<boolean> {
+): Promise<"admin" | "superadmin" | null> {
   try {
     const metadata = await sock.groupMetadata(groupJid);
     const targetNorm = normalizeJid(participantJid);
@@ -18,12 +25,22 @@ export async function isParticipantAdmin(
       const lidNorm = (p as unknown as { lid?: string }).lid ? normalizeJid((p as unknown as { lid: string }).lid) : null;
       return idNorm === targetNorm || lidNorm === targetNorm;
     });
-    commandLogger.info({ type: "admin_event", action: "check_admin", groupJid, participantJid, targetNorm, found: !!participant, admin: participant?.admin }, "admin check");
-    return participant?.admin === "admin" || participant?.admin === "superadmin";
+    const role = (participant?.admin as "admin" | "superadmin" | undefined) ?? null;
+    commandLogger.info({ type: "admin_event", action: "check_admin", groupJid, participantJid, targetNorm, found: !!participant, admin: role }, "admin check");
+    return role;
   } catch (error) {
     commandLogger.error({ type: "admin_event", action: "check_admin_failed", groupJid, participantJid, error }, "failed to check admin");
-    return false;
+    return null;
   }
+}
+
+export async function isParticipantAdmin(
+  sock: WASocket,
+  groupJid: string,
+  participantJid: string,
+): Promise<boolean> {
+  const role = await getParticipantRole(sock, groupJid, participantJid);
+  return role === "admin" || role === "superadmin";
 }
 
 export async function isBotAdmin(sock: WASocket, groupJid: string): Promise<boolean> {
@@ -73,15 +90,30 @@ function getContextInfo(msg: import("baileys").proto.IWebMessageInfo): import("b
   );
 }
 
-export function getTargetJid(msg: import("baileys").proto.IWebMessageInfo): string | null {
+export async function getTargetJid(sock: WASocket, groupJid: string, msg: import("baileys").proto.IWebMessageInfo): Promise<string | null> {
   const contextInfo = getContextInfo(msg);
   const mentioned = contextInfo?.mentionedJid?.[0];
   if (mentioned) return mentioned;
   const quoted = (contextInfo as unknown as { participant?: string })?.participant;
   if (quoted) return quoted;
-  // fallback: check quotedMessage participant via extendedTextMessage
   const quoted2 = msg.message?.extendedTextMessage?.contextInfo?.participant;
   if (quoted2) return quoted2;
+  // fallback: parse @number from text when mention entity is missing (e.g. typed "@928..." )
+  const text = msg.message?.extendedTextMessage?.text ?? msg.message?.conversation ?? "";
+  const atMatch = text.match(/@(\d{5,20})/);
+  if (atMatch?.[1]) {
+    const num = atMatch[1];
+    // lookup real JID in groupMetadata by number base (handles LID vs s.whatsapp.net)
+    try {
+      const metadata = await sock.groupMetadata(groupJid);
+      const participant = metadata.participants.find((p) => {
+        const pAny = p as unknown as { lid?: string; phoneNumber?: string };
+        return normalizeJid(p.id) === num || (pAny.lid && normalizeJid(pAny.lid) === num) || (pAny.phoneNumber && normalizeJid(pAny.phoneNumber) === num);
+      });
+      if (participant) return participant.id;
+    } catch {}
+    return `${num}@lid`;
+  }
   return null;
 }
 
