@@ -17,6 +17,7 @@ import {
 } from "../utils/sticker.js";
 import { sendReaction } from "../messages/react.js";
 import { commandLogger } from "../utils/logger.js";
+import { debugMessageContext, getTargetJid, isBotAdmin, isParticipantAdmin } from "../utils/admin.js";
 
 export async function commandController(
     sock: WASocket,
@@ -209,6 +210,45 @@ export async function commandController(
                 },
             );
             await sendReaction(sock, msg, "✅");
+            break;
+        }
+        case "ban":
+        case "kick": {
+            if (jidType !== "group") {
+                await sendReaction(sock, msg, "❓");
+                await sock.sendMessage(jid, { text: "Este comando só funciona em grupos." }, { quoted: msg });
+                break;
+            }
+            const senderJid = msg.key.participant ?? msg.key.remoteJid!;
+            const targetJid = getTargetJid(msg);
+            commandLogger.info({ type: "admin_event", action: "ban_attempt", jid, senderJid, targetJid, debug: debugMessageContext(msg) }, "ban attempt");
+            if (!targetJid) {
+                await sendReaction(sock, msg, "❓");
+                await sock.sendMessage(jid, { text: "Marque ou responda alguém para banir. Ex: !ban @usuario" }, { quoted: msg });
+                commandLogger.info({ type: "admin_event", action: "ban_no_target", jid, senderJid }, "ban no target");
+                break;
+            }
+            if (!await isParticipantAdmin(sock, jid, senderJid)) {
+                await sendReaction(sock, msg, "❌");
+                await sock.sendMessage(jid, { text: "❌ Você precisa ser admin para usar este comando." }, { quoted: msg });
+                commandLogger.info({ type: "admin_event", action: "ban_sender_not_admin", jid, senderJid }, "ban sender not admin");
+                break;
+            }
+            if (!await isBotAdmin(sock, jid)) {
+                await sendReaction(sock, msg, "❌");
+                await sock.sendMessage(jid, { text: "❌ Eu preciso ser admin para banir." }, { quoted: msg });
+                commandLogger.info({ type: "admin_event", action: "ban_bot_not_admin", jid }, "ban bot not admin");
+                break;
+            }
+            try {
+                await sock.groupParticipantsUpdate(jid, [targetJid], "remove");
+                await sendReaction(sock, msg, "✅");
+                commandLogger.info({ type: "admin_event", action: "ban", jid, targetJid, senderJid }, "ban succeeded");
+            } catch (error) {
+                commandLogger.error({ type: "admin_event", action: "ban_failed", jid, targetJid, error }, "ban failed");
+                await sendReaction(sock, msg, "⚠️");
+                await sock.sendMessage(jid, { text: "Não foi possível banir." }, { quoted: msg });
+            }
             break;
         }
         default:
