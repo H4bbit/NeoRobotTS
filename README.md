@@ -11,17 +11,65 @@ O projeto é desenvolvido principalmente no **Termux (Android)**, mas pode ser e
 - Arquitetura baseada em eventos
 - Sistema modular de comandos
 - Persistência de autenticação utilizando SQLite
-- Conversão e manipulação de mídia
-- Compatível com Termux
+- Conversão e manipulação de mídia (`!s`, `!toimg`, `!tovideo`)
+- Comandos de administração de grupos (`!ban`, `!promover`, `!rebaixar`, `!abrir`, `!fechar`)
+- Logger centralizado com `pino` e métricas de conversão
+- Compatível com Termux (Android ARM64)
 - Escrito em TypeScript utilizando ES Modules
 
 ## 🛠️ Stack
 
 - Node.js 24+
 - TypeScript
-- Baileys
-- better-sqlite3
-- SQLite
+- Baileys 7.x RC
+- better-sqlite3 + SQLite
+- ffmpeg + webpmux (conversão de mídia)
+- pino (logs estruturados)
+
+## ⚙️ Configuração
+
+Variáveis de ambiente:
+
+| Variável | Descrição | Exemplo |
+|----------|-----------|---------|
+| `WHATSAPP_PHONE_NUMBER` | Número para pareamento via código | `5511999999999` |
+| `LOG_LEVEL` | Nível do logger `pino` | `info` (padrão) |
+| `FORCE_RESET` | Se `true`, limpa `data/auth` ao iniciar | `false` |
+
+Exemplo:
+
+```sh
+export WHATSAPP_PHONE_NUMBER="5511999999999"
+npm start
+```
+
+## 💬 Comandos
+
+### Geral
+| Comando | Descrição |
+|---------|-----------|
+| `!ping` | Responde Pong |
+| `!boton` / `!botoff` | Ativa/desativa o bot no grupo (persiste em SQLite) |
+
+### Mídia
+| Comando | Descrição | Uso |
+|---------|-----------|-----|
+| `!s` / `!sticker` | Imagem/vídeo → sticker | Responda ou marque mídia |
+| `!toimg` | Sticker → imagem PNG | Responda um sticker |
+| `!tovideo` | Sticker animado → vídeo MP4 | Responda um sticker animado |
+
+> Vídeos para sticker devem ter no máximo 10s.
+
+### Administração (apenas grupos, requer bot admin)
+| Comando | Aliases | Descrição | Uso |
+|---------|---------|-----------|-----|
+| `!ban` | `!banir`, `!kick` | Remove do grupo | `!ban @usuario` ou responda |
+| `!promote` | `!promover`, `!up` | Promove a admin | `!promote @usuario` |
+| `!demote` | `!rebaixar`, `!down` | Rebaixa admin | `!demote @usuario` |
+| `!abrir` | `!open` | Abre o grupo (todos falam) | `!abrir` |
+| `!fechar` | `!close` | Fecha o grupo (só admin fala) | `!fechar` |
+
+> Todos os comandos de admin verificam `LID`/`s.whatsapp.net` e exigem que o bot também seja admin.
 
 ## 📦 Instalação
 
@@ -43,17 +91,35 @@ npm run build
 npm start
 ```
 
+Pareamento: na primeira execução, se `WHATSAPP_PHONE_NUMBER` estiver definido, o código de 8 dígitos será exibido no terminal (Vá em Aparelhos Conectados > Conectar com número).
+
 ## 📁 Estrutura do projeto
 
 ```text
 src/
-├── auth/        # Persistência e autenticação
-├── commands/    # Sistema de comandos
+├── auth/        # Persistência SQLite (Baileys creds)
+├── commands/    # Controller + DB de grupos ativos
 ├── events/      # Dispatcher e logger
-├── messages/    # Processamento de mensagens
-├── types/       # Declarações de tipos
-├── utils/       # Utilitários
-└── index.ts     # Entrypoint
+├── messages/    # Parser, tipos e reações
+├── utils/       # jid, logger, admin, sticker, metadataWebp
+└── index.ts     # Entrypoint + pareamento
+```
+
+## 📊 Logs
+
+Logger centralizado em `src/utils/logger.ts` com `pino`:
+
+- `module: command` → `command_event` (comando, jid, sender, runtime)
+- `module: db` → `db_event` (READ_GROUP, SET_GROUP_ACTIVE)
+- `module: webp` → `webp_conversion_event` (start, inspection, frames_extracted, concat_written, encode_start/done, success/failure com tamanhos e duração)
+- `module: sticker` → `sticker_event` (image/video_start/success)
+- `module: command` + `admin_event` → `ban/promote/demote/open/close`
+
+Filtre com `grep`:
+
+```sh
+cat bot.log | grep 'module.*webp'
+cat bot.log | grep 'admin_event'
 ```
 
 ## 📜 Scripts
