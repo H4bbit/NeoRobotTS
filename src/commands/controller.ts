@@ -15,6 +15,7 @@ import {
     videoToSticker,
 } from "../utils/sticker.js";
 import { sendReaction } from "../messages/react.js";
+import { commandLogger } from "../utils/logger.js";
 
 export async function commandController(
     sock: WASocket,
@@ -110,6 +111,7 @@ export async function commandController(
 
             try {
                 const input = await downloadStickerMedia(media);
+                commandLogger.info({ type: "command_event", command: "tovideo", jid, stage: "downloaded", inputSize: input.length }, "tovideo downloaded");
                 const video = await animatedWebpToVideo(input);
 
                 await sock.sendMessage(jid, {
@@ -121,6 +123,7 @@ export async function commandController(
                     },
                 );
                 await sendReaction(sock, msg, "✅");
+                commandLogger.info({ type: "command_event", command: "tovideo", jid, outputSize: video.length }, "tovideo succeeded");
             } catch (error) {
                 const text = error instanceof StickerConversionError
                     ? error.message
@@ -170,7 +173,7 @@ export async function commandController(
                 }
             }
             const input = await downloadStickerMedia(media);
-
+            commandLogger.info({ type: "command_event", command: "sticker", jid, mediaType: media.type, inputSize: input.length }, "sticker downloaded");
             const sticker =
                 media.type === "image"
                     ? await imageToSticker(input, sender)

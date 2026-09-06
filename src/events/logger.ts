@@ -1,8 +1,6 @@
-import P from "pino";
 import os from "node:os";
 import process from "node:process";
-
-const logger = P({ level: "info" });
+import { commandLogger as logger } from "../utils/logger.js";
 
 function getRuntimeInfo() {
   return {
