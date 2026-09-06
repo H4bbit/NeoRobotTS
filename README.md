@@ -1,5 +1,7 @@
 # NeoRobotTS 🤖
 
+![Node](https://img.shields.io/badge/Node-24.x-brightgreen) ![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue) ![Baileys](https://img.shields.io/badge/Baileys-7.x-black) ![License](https://img.shields.io/badge/license-ISC-yellow) ![Platform](https://img.shields.io/badge/platform-Termux%20%7C%20Linux-lightgrey)
+
 Bot de WhatsApp escrito em **TypeScript** utilizando **Baileys**, com arquitetura modular e persistência local em SQLite.
 
 O projeto é desenvolvido principalmente no **Termux (Android)**, mas pode ser executado em qualquer ambiente compatível com Node.js.
