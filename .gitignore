@@ -2,3 +2,7 @@ dist/
 node_modules/
 data/auth/whatsapp.sqlite
 data/
+
+# logs
+*.log
+bot.log
