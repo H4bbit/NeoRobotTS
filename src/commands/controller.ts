@@ -288,6 +288,66 @@ export async function commandController(
             }
             break;
         }
+        case "abrir":
+        case "open": {
+            if (jidType !== "group") {
+                await sendReaction(sock, msg, "❓");
+                await sock.sendMessage(jid, { text: "Este comando só funciona em grupos." }, { quoted: msg });
+                break;
+            }
+            const senderJid = msg.key.participant ?? msg.key.remoteJid!;
+            if (!await isParticipantAdmin(sock, jid, senderJid)) {
+                await sendReaction(sock, msg, "❌");
+                await sock.sendMessage(jid, { text: "❌ Você precisa ser admin para usar este comando." }, { quoted: msg });
+                break;
+            }
+            if (!await isBotAdmin(sock, jid)) {
+                await sendReaction(sock, msg, "❌");
+                await sock.sendMessage(jid, { text: "❌ Eu preciso ser admin para abrir o grupo." }, { quoted: msg });
+                break;
+            }
+            try {
+                await sock.groupSettingUpdate(jid, "not_announcement");
+                await sendReaction(sock, msg, "✅");
+                await sock.sendMessage(jid, { text: "✅ Grupo aberto" }, { quoted: msg });
+                commandLogger.info({ type: "admin_event", action: "open", jid, senderJid }, "group opened");
+            } catch (error) {
+                commandLogger.error({ type: "admin_event", action: "open_failed", jid, error }, "open failed");
+                await sendReaction(sock, msg, "⚠️");
+                await sock.sendMessage(jid, { text: "Não foi possível abrir o grupo." }, { quoted: msg });
+            }
+            break;
+        }
+        case "fechar":
+        case "close": {
+            if (jidType !== "group") {
+                await sendReaction(sock, msg, "❓");
+                await sock.sendMessage(jid, { text: "Este comando só funciona em grupos." }, { quoted: msg });
+                break;
+            }
+            const senderJid = msg.key.participant ?? msg.key.remoteJid!;
+            if (!await isParticipantAdmin(sock, jid, senderJid)) {
+                await sendReaction(sock, msg, "❌");
+                await sock.sendMessage(jid, { text: "❌ Você precisa ser admin para usar este comando." }, { quoted: msg });
+                break;
+            }
+            if (!await isBotAdmin(sock, jid)) {
+                await sendReaction(sock, msg, "❌");
+                await sock.sendMessage(jid, { text: "❌ Eu preciso ser admin para fechar o grupo." }, { quoted: msg });
+                break;
+            }
+            try {
+                await sock.groupSettingUpdate(jid, "announcement");
+                await sendReaction(sock, msg, "✅");
+                await sock.sendMessage(jid, { text: "✅ Grupo fechado" }, { quoted: msg });
+                commandLogger.info({ type: "admin_event", action: "close", jid, senderJid }, "group closed");
+            } catch (error) {
+                commandLogger.error({ type: "admin_event", action: "close_failed", jid, error }, "close failed");
+                await sendReaction(sock, msg, "⚠️");
+                await sock.sendMessage(jid, { text: "Não foi possível fechar o grupo." }, { quoted: msg });
+            }
+            break;
+        }
         case "ban":
         case "banir":
         case "kick": {
