@@ -13,6 +13,7 @@ import {
     getWebpStickerMedia,
     imageToSticker,
     videoToSticker,
+    webpToImage,
 } from "../utils/sticker.js";
 import { sendReaction } from "../messages/react.js";
 import { commandLogger } from "../utils/logger.js";
@@ -137,6 +138,27 @@ export async function commandController(
                         quoted: msg,
                     },
                 );
+            }
+            break;
+        }
+        case "toimg": {
+            const media = getWebpStickerMedia(msg);
+            if (!media) {
+                await sendReaction(sock, msg, "❓");
+                await sock.sendMessage(jid, { text: "Marque ou responda um sticker." }, { quoted: msg });
+                break;
+            }
+            try {
+                const input = await downloadStickerMedia(media);
+                commandLogger.info({ type: "command_event", command: "toimg", jid, stage: "downloaded", inputSize: input.length }, "toimg downloaded");
+                const image = await webpToImage(input);
+                await sock.sendMessage(jid, { image, mimetype: "image/png" }, { quoted: msg });
+                await sendReaction(sock, msg, "✅");
+                commandLogger.info({ type: "command_event", command: "toimg", jid, outputSize: image.length }, "toimg succeeded");
+            } catch (error) {
+                const text = error instanceof StickerConversionError ? error.message : "Não foi possível converter o sticker em imagem.";
+                await sendReaction(sock, msg, "⚠️");
+                await sock.sendMessage(jid, { text }, { quoted: msg });
             }
             break;
         }
