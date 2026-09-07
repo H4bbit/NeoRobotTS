@@ -20,9 +20,9 @@ CREATE TABLE IF NOT EXISTS active_groups (
 type ActiveGroupRow = { is_active: number };
 
 export function isGroupActive(jid: string): boolean {
-  const row = db
-    .prepare("SELECT is_active FROM active_groups WHERE jid = ?")
-    .get(jid) as ActiveGroupRow | undefined;
+  const row = db.prepare("SELECT is_active FROM active_groups WHERE jid = ?").get(jid) as
+    | ActiveGroupRow
+    | undefined;
 
   const value = !!(row && row.is_active === 1);
 
@@ -41,9 +41,10 @@ export function isGroupActive(jid: string): boolean {
 }
 
 export function setGroupActive(jid: string, active: boolean): void {
-  db.prepare(
-    "INSERT OR REPLACE INTO active_groups (jid, is_active) VALUES (?, ?)",
-  ).run(jid, active ? 1 : 0);
+  db.prepare("INSERT OR REPLACE INTO active_groups (jid, is_active) VALUES (?, ?)").run(
+    jid,
+    active ? 1 : 0,
+  );
 
   logger.info(
     {

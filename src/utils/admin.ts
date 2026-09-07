@@ -22,14 +22,30 @@ export async function getParticipantRole(
     const targetNorm = normalizeJid(participantJid);
     const participant = metadata.participants.find((p) => {
       const idNorm = normalizeJid(p.id);
-      const lidNorm = (p as unknown as { lid?: string }).lid ? normalizeJid((p as unknown as { lid: string }).lid) : null;
+      const lidNorm = (p as unknown as { lid?: string }).lid
+        ? normalizeJid((p as unknown as { lid: string }).lid)
+        : null;
       return idNorm === targetNorm || lidNorm === targetNorm;
     });
     const role = (participant?.admin as "admin" | "superadmin" | undefined) ?? null;
-    commandLogger.info({ type: "admin_event", action: "check_admin", groupJid, participantJid, targetNorm, found: !!participant, admin: role }, "admin check");
+    commandLogger.info(
+      {
+        type: "admin_event",
+        action: "check_admin",
+        groupJid,
+        participantJid,
+        targetNorm,
+        found: !!participant,
+        admin: role,
+      },
+      "admin check",
+    );
     return role;
   } catch (error) {
-    commandLogger.error({ type: "admin_event", action: "check_admin_failed", groupJid, participantJid, error }, "failed to check admin");
+    commandLogger.error(
+      { type: "admin_event", action: "check_admin_failed", groupJid, participantJid, error },
+      "failed to check admin",
+    );
     return null;
   }
 }
@@ -63,34 +79,74 @@ export async function isBotAdmin(sock: WASocket, groupJid: string): Promise<bool
       const idNorm = normalizeJid(p.id);
       const lidNorm = pAny.lid ? normalizeJid(pAny.lid) : null;
       const phoneNorm = pAny.phoneNumber ? normalizeJid(pAny.phoneNumber) : null;
-      return idNorm === botNorm || lidNorm === botNorm || phoneNorm === botNorm || (botLid && (idNorm === normalizeJid(botLid) || lidNorm === normalizeJid(botLid)));
+      return (
+        idNorm === botNorm ||
+        lidNorm === botNorm ||
+        phoneNorm === botNorm ||
+        (botLid && (idNorm === normalizeJid(botLid) || lidNorm === normalizeJid(botLid)))
+      );
     });
     if (participant) {
-      commandLogger.info({ type: "admin_event", action: "bot_lookup", groupJid, botJid, botLid, foundId: participant.id, admin: participant.admin }, "bot admin lookup via phoneNumber");
+      commandLogger.info(
+        {
+          type: "admin_event",
+          action: "bot_lookup",
+          groupJid,
+          botJid,
+          botLid,
+          foundId: participant.id,
+          admin: participant.admin,
+        },
+        "bot admin lookup via phoneNumber",
+      );
       return participant.admin === "admin" || participant.admin === "superadmin";
     }
     // Last resort: dump participants for debug
-    commandLogger.info({ type: "admin_event", action: "bot_not_found", groupJid, botJid, botLid, participants: metadata.participants.map((p) => ({ id: p.id, admin: p.admin, lid: (p as unknown as { lid?: string }).lid, phoneNumber: (p as unknown as { phoneNumber?: string }).phoneNumber })) }, "bot not found in participants");
+    commandLogger.info(
+      {
+        type: "admin_event",
+        action: "bot_not_found",
+        groupJid,
+        botJid,
+        botLid,
+        participants: metadata.participants.map((p) => ({
+          id: p.id,
+          admin: p.admin,
+          lid: (p as unknown as { lid?: string }).lid,
+          phoneNumber: (p as unknown as { phoneNumber?: string }).phoneNumber,
+        })),
+      },
+      "bot not found in participants",
+    );
     return false;
   } catch (error) {
-    commandLogger.error({ type: "admin_event", action: "isBotAdmin_failed", groupJid, error }, "isBotAdmin failed");
+    commandLogger.error(
+      { type: "admin_event", action: "isBotAdmin_failed", groupJid, error },
+      "isBotAdmin failed",
+    );
     return false;
   }
 }
 
-function getContextInfo(msg: import("baileys").proto.IWebMessageInfo): import("baileys").proto.IContextInfo | null | undefined {
+function getContextInfo(
+  msg: import("baileys").proto.IWebMessageInfo,
+): import("baileys").proto.IContextInfo | null | undefined {
   const m = msg.message;
   if (!m) return null;
-  return (
-    m.extendedTextMessage?.contextInfo ??
+  return (m.extendedTextMessage?.contextInfo ??
     m.imageMessage?.contextInfo ??
     m.videoMessage?.contextInfo ??
     m.stickerMessage?.contextInfo ??
-    m.conversation ? undefined : undefined
-  );
+    m.conversation)
+    ? undefined
+    : undefined;
 }
 
-export async function getTargetJid(sock: WASocket, groupJid: string, msg: import("baileys").proto.IWebMessageInfo): Promise<string | null> {
+export async function getTargetJid(
+  sock: WASocket,
+  groupJid: string,
+  msg: import("baileys").proto.IWebMessageInfo,
+): Promise<string | null> {
   const contextInfo = getContextInfo(msg);
   const mentioned = contextInfo?.mentionedJid?.[0];
   if (mentioned) return mentioned;
@@ -108,7 +164,11 @@ export async function getTargetJid(sock: WASocket, groupJid: string, msg: import
       const metadata = await sock.groupMetadata(groupJid);
       const participant = metadata.participants.find((p) => {
         const pAny = p as unknown as { lid?: string; phoneNumber?: string };
-        return normalizeJid(p.id) === num || (pAny.lid && normalizeJid(pAny.lid) === num) || (pAny.phoneNumber && normalizeJid(pAny.phoneNumber) === num);
+        return (
+          normalizeJid(p.id) === num ||
+          (pAny.lid && normalizeJid(pAny.lid) === num) ||
+          (pAny.phoneNumber && normalizeJid(pAny.phoneNumber) === num)
+        );
       });
       if (participant) return participant.id;
     } catch {}
@@ -117,14 +177,17 @@ export async function getTargetJid(sock: WASocket, groupJid: string, msg: import
   return null;
 }
 
-export function debugMessageContext(msg: import("baileys").proto.IWebMessageInfo): Record<string, unknown> {
+export function debugMessageContext(
+  msg: import("baileys").proto.IWebMessageInfo,
+): Record<string, unknown> {
   const m = msg.message;
   return {
     hasExtended: !!m?.extendedTextMessage,
     hasConversation: !!m?.conversation,
     text: m?.extendedTextMessage?.text ?? m?.conversation ?? null,
     mentionedJid: getContextInfo(msg)?.mentionedJid ?? null,
-    quotedParticipant: (getContextInfo(msg) as unknown as { participant?: string })?.participant ?? null,
+    quotedParticipant:
+      (getContextInfo(msg) as unknown as { participant?: string })?.participant ?? null,
     keyParticipant: msg.key?.participant ?? null,
     remoteJid: msg.key?.remoteJid ?? null,
   };

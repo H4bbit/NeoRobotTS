@@ -1,4 +1,5 @@
-import Database from "better-sqlite3";
+import fs from "node:fs";
+import path from "node:path";
 import {
   type AuthenticationCreds,
   type AuthenticationState,
@@ -7,9 +8,7 @@ import {
   type SignalDataSet,
   type SignalDataTypeMap,
 } from "baileys";
-
-import fs from "node:fs";
-import path from "node:path";
+import Database from "better-sqlite3";
 
 export async function useSQLiteAuthState(dbPath: string): Promise<{
   state: AuthenticationState;
@@ -31,9 +30,7 @@ export async function useSQLiteAuthState(dbPath: string): Promise<{
     `);
 
   const getStmt = db.prepare("SELECT value FROM auth WHERE id = ?");
-  const setStmt = db.prepare(
-    "INSERT OR REPLACE INTO auth (id, value) VALUES (?, ?)",
-  );
+  const setStmt = db.prepare("INSERT OR REPLACE INTO auth (id, value) VALUES (?, ?)");
   const delStmt = db.prepare("DELETE FROM auth WHERE id = ?");
 
   const read = <T = unknown>(id: string): T | undefined => {
@@ -45,8 +42,7 @@ export async function useSQLiteAuthState(dbPath: string): Promise<{
     setStmt.run(id, JSON.stringify(value, BufferJSON.replacer));
   };
 
-  const creds: AuthenticationCreds =
-    read<AuthenticationCreds>("creds") ?? initAuthCreds();
+  const creds: AuthenticationCreds = read<AuthenticationCreds>("creds") ?? initAuthCreds();
 
   const state: AuthenticationState = {
     creds,

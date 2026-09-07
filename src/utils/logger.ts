@@ -1,5 +1,5 @@
-import P from "pino";
 import os from "node:os";
+import P from "pino";
 
 export const logger = P({
   level: process.env.LOG_LEVEL ?? "info",

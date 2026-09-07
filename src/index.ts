@@ -1,29 +1,26 @@
-import { Boom } from "@hapi/boom";
-import NodeCache from "@cacheable/node-cache";
-import P from "pino";
 import fs from "node:fs";
-
+import NodeCache from "@cacheable/node-cache";
+import { Boom } from "@hapi/boom";
 import {
-  makeWASocket,
   type CacheStore,
-  type WAMessageContent,
-  type WAMessageKey,
   DisconnectReason,
   fetchLatestBaileysVersion,
   makeCacheableSignalKeyStore,
+  makeWASocket,
   proto,
+  type WAMessageContent,
+  type WAMessageKey,
 } from "baileys";
+import P from "pino";
 
 import { useSQLiteAuthState } from "./auth/sqliteAuth.js";
-import { parseMessage } from "./messages/parser.js";
 import { dispatchEvent } from "./events/dispatcher.js";
+import { parseMessage } from "./messages/parser.js";
 
 const logger = P({ level: "silent" });
 const msgRetryCounterCache = new NodeCache() as CacheStore;
 
-async function getMessage(
-  key: WAMessageKey,
-): Promise<WAMessageContent | undefined> {
+async function getMessage(key: WAMessageKey): Promise<WAMessageContent | undefined> {
   return proto.Message.fromObject({});
 }
 
@@ -36,9 +33,7 @@ const startSock = async () => {
     fs.rmSync("./data/auth", { recursive: true, force: true });
   }
 
-  const { state, saveCreds } = await useSQLiteAuthState(
-    "./data/auth/whatsapp.sqlite",
-  );
+  const { state, saveCreds } = await useSQLiteAuthState("./data/auth/whatsapp.sqlite");
 
   const { version } = await fetchLatestBaileysVersion();
 
@@ -67,8 +62,7 @@ const startSock = async () => {
 
       if (connection === "close") {
         const shouldReconnect =
-          (lastDisconnect?.error as Boom)?.output?.statusCode !==
-          DisconnectReason.loggedOut;
+          (lastDisconnect?.error as Boom)?.output?.statusCode !== DisconnectReason.loggedOut;
 
         if (shouldReconnect) {
           startSock();
@@ -101,10 +95,7 @@ const startSock = async () => {
 
     await sleep(3000);
 
-    const phoneNumber = (process.env.WHATSAPP_PHONE_NUMBER || "").replace(
-      /\D/g,
-      "",
-    );
+    const phoneNumber = (process.env.WHATSAPP_PHONE_NUMBER || "").replace(/\D/g, "");
 
     if (!phoneNumber) {
       console.log("❌ WHATSAPP_PHONE_NUMBER não definido");
@@ -116,13 +107,9 @@ const startSock = async () => {
 
       const code = await sock.requestPairingCode(phoneNumber, undefined);
 
-      console.log(
-        `\n✅ CÓDIGO DE PAREAMENTO: ${code?.match(/.{1,4}/g)?.join("-")}`,
-      );
+      console.log(`\n✅ CÓDIGO DE PAREAMENTO: ${code?.match(/.{1,4}/g)?.join("-")}`);
 
-      console.log(
-        "Vá em: Aparelhos Conectados > Conectar com número de telefone\n",
-      );
+      console.log("Vá em: Aparelhos Conectados > Conectar com número de telefone\n");
     } catch (err) {
       console.error("Erro no pairing:", err);
       process.exit(1);
