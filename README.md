@@ -11,7 +11,7 @@ O projeto é desenvolvido principalmente no **Termux (Android)**, mas pode ser e
 - Arquitetura baseada em eventos
 - Sistema modular de comandos
 - Persistência de autenticação utilizando SQLite
-- Conversão e manipulação de mídia (`!s`, `!toimg`, `!tovideo`)
+- Conversão e manipulação de mídia (`!s`, `!toimg`, `!tovideo`, `!tovideo2` via Pillow — fallback para WebP corrompido)
 - Comandos de administração de grupos (`!ban`, `!promover`, `!rebaixar`, `!abrir`, `!fechar`)
 - Logger centralizado com `pino` e métricas de conversão
 - Compatível com Termux (Android ARM64)
@@ -23,7 +23,7 @@ O projeto é desenvolvido principalmente no **Termux (Android)**, mas pode ser e
 - TypeScript 5.x
 - Baileys 7.x RC (7.0.0-rc14)
 - better-sqlite3 + SQLite
-- ffmpeg + webpmux (conversão de mídia)
+- ffmpeg + webpmux + Pillow via `python3` (conversão de mídia; Pillow isolado em `!tovideo2`)
 - pino (logs estruturados)
 - Biome 2.5 (lint + format)
 
@@ -58,6 +58,7 @@ npm start
 | `!s` / `!sticker` | Imagem/vídeo → sticker | Responda ou marque mídia |
 | `!toimg` | Sticker → imagem PNG | Responda um sticker |
 | `!tovideo` | Sticker animado → vídeo MP4 | Responda um sticker animado |
+| `!tovideo2` | Sticker animado → vídeo MP4 (Pillow fallback) | Responda um sticker animado (quando `!tovideo` falha) |
 
 > Vídeos para sticker devem ter no máximo 10s.
 
