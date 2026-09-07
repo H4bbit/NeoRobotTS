@@ -25,6 +25,7 @@ import {
   webpToImage,
 } from "../utils/sticker.js";
 import { isGroupActive, setGroupActive } from "./db.js";
+import { requireBotAdmin, requireGroup, requireSenderAdmin } from "./helpers.js";
 
 export async function commandController(
   sock: WASocket,
@@ -459,34 +460,11 @@ export async function commandController(
     }
     case "abrir":
     case "open": {
-      if (jidType !== "group") {
-        await sendReaction(sock, msg, "❓");
-        await sock.sendMessage(
-          jid,
-          { text: "Este comando só funciona em grupos." },
-          { quoted: msg },
-        );
+      if (!(await requireGroup(sock, jid, msg as import("baileys").WAMessage, jidType))) break;
+      const senderJid = await requireSenderAdmin(sock, jid, msg as import("baileys").WAMessage);
+      if (!senderJid) break;
+      if (!(await requireBotAdmin(sock, jid, msg as import("baileys").WAMessage, "abrir o grupo")))
         break;
-      }
-      const senderJid = msg.key.participant ?? msg.key.remoteJid!;
-      if (!(await isParticipantAdmin(sock, jid, senderJid))) {
-        await sendReaction(sock, msg, "❌");
-        await sock.sendMessage(
-          jid,
-          { text: "❌ Você precisa ser admin para usar este comando." },
-          { quoted: msg },
-        );
-        break;
-      }
-      if (!(await isBotAdmin(sock, jid))) {
-        await sendReaction(sock, msg, "❌");
-        await sock.sendMessage(
-          jid,
-          { text: "❌ Eu preciso ser admin para abrir o grupo." },
-          { quoted: msg },
-        );
-        break;
-      }
       try {
         await sock.groupSettingUpdate(jid, "not_announcement");
         await sendReaction(sock, msg, "✅");
