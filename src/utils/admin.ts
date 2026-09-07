@@ -1,4 +1,5 @@
 import { type WASocket } from "baileys";
+import { getCachedGroupMetadata } from "./groupCache.js";
 import { commandLogger } from "./logger.js";
 
 export function normalizeJid(jid: string): string {
@@ -18,7 +19,7 @@ export async function getParticipantRole(
   participantJid: string,
 ): Promise<"admin" | "superadmin" | null> {
   try {
-    const metadata = await sock.groupMetadata(groupJid);
+    const metadata = await getCachedGroupMetadata(sock, groupJid);
     const targetNorm = normalizeJid(participantJid);
     const participant = metadata.participants.find((p) => {
       const idNorm = normalizeJid(p.id);
@@ -64,7 +65,7 @@ export async function isBotAdmin(sock: WASocket, groupJid: string): Promise<bool
   if (!botJid) return false;
   // In LID groups, bot may be listed by LID not phone. Try phone, lid, and lookup via metadata phoneNumber field
   try {
-    const metadata = await sock.groupMetadata(groupJid);
+    const metadata = await getCachedGroupMetadata(sock, groupJid);
     const botNorm = normalizeJid(botJid);
     // also try sock.user.lid if exists (Baileys may store lid)
     const botLid = (sock.user as unknown as { lid?: string })?.lid;
@@ -161,7 +162,7 @@ export async function getTargetJid(
     const num = atMatch[1];
     // lookup real JID in groupMetadata by number base (handles LID vs s.whatsapp.net)
     try {
-      const metadata = await sock.groupMetadata(groupJid);
+      const metadata = await getCachedGroupMetadata(sock, groupJid);
       const participant = metadata.participants.find((p) => {
         const pAny = p as unknown as { lid?: string; phoneNumber?: string };
         return (

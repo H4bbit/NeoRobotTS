@@ -17,10 +17,10 @@ import P from "pino";
 import { useSQLiteAuthState } from "./auth/sqliteAuth.js";
 import { dispatchEvent } from "./events/dispatcher.js";
 import { parseMessage } from "./messages/parser.js";
+import { groupCache } from "./utils/groupCache.js";
 
 const logger = P({ level: "silent" });
 const msgRetryCounterCache = new NodeCache() as CacheStore;
-const groupCache = new NodeCache({ stdTTL: 5 * 60, useClones: false });
 
 async function getMessage(key: WAMessageKey): Promise<WAMessageContent | undefined> {
   return proto.Message.fromObject({});
