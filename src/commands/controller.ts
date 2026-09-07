@@ -23,6 +23,7 @@ import {
   videoToSticker,
   webpToImage,
 } from "../utils/sticker.js";
+import { animatedWebpToVideoViaPillow } from "../utils/tovideoPillow.js";
 import { isGroupActive, setGroupActive } from "./db.js";
 import { requireBotAdmin, requireGroup, requireSenderAdmin } from "./helpers.js";
 
@@ -171,6 +172,27 @@ export async function commandController(
             quoted: msg,
           },
         );
+      }
+      break;
+    }
+    case "tovideo2": {
+      const media = getWebpStickerMedia(msg);
+      if (!media) {
+        await sendReaction(sock, msg, "❓");
+        await sock.sendMessage(jid, { text: "Marque ou responda um sticker." }, { quoted: msg });
+        break;
+      }
+      try {
+        const input = await downloadStickerMedia(media);
+        commandLogger.info({ type: "command_event", command: "tovideo2", jid, stage: "downloaded", inputSize: input.length }, "tovideo2 downloaded");
+        const video = await animatedWebpToVideoViaPillow(input);
+        await sock.sendMessage(jid, { video, mimetype: "video/mp4" }, { quoted: msg });
+        await sendReaction(sock, msg, "✅");
+        commandLogger.info({ type: "command_event", command: "tovideo2", jid, outputSize: video.length }, "tovideo2 succeeded");
+      } catch (error) {
+        const text = error instanceof StickerConversionError ? error.message : "Não foi possível converter o sticker em vídeo (tovideo2).";
+        await sendReaction(sock, msg, "⚠️");
+        await sock.sendMessage(jid, { text }, { quoted: msg });
       }
       break;
     }
