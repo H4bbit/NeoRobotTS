@@ -5,8 +5,14 @@ import os from "node:os";
 import path from "node:path";
 import { downloadContentFromMessage, proto } from "baileys";
 import ffmpeg from "fluent-ffmpeg";
+import PQueue from "p-queue";
 import { webpLogger as logger, stickerLogger } from "./logger.js";
 import { addStickerMetadata } from "./metadataWebp.js";
+
+// Fila local para limitar concorrência de conversões CPU-bound (FFmpeg/webpmux).
+// concurrency: 2 é um limite inicial ajustável por observabilidade; não é um ótimo
+// definitivo e não há afirmação de ganho específico de latência.
+const conversionQueue = new PQueue({ concurrency: 2 });
 
 type ImageMessage = proto.Message.IImageMessage;
 type VideoMessage = proto.Message.IVideoMessage;
@@ -438,29 +444,30 @@ async function writeConcatFile(file: string, frames: string[], info: AnimatedWeb
 }
 
 export async function animatedWebpToVideo(buffer: Buffer): Promise<Buffer> {
-  const startMs = Date.now();
-  logger.info(
-    {
-      type: "webp_conversion_event",
-      event: "start",
-      fileSize: buffer.length,
-    },
-    "webp conversion started",
-  );
-
-  let stage: WebpConversionStage = "validate_input";
-
-  if (!isWebpBuffer(buffer)) {
-    const error = new StickerConversionError(
-      "Envie um sticker WebP válido para converter.",
-      "invalid_webp_file",
-      stage,
+  return conversionQueue.add(async () => {
+    const startMs = Date.now();
+    logger.info(
+      {
+        type: "webp_conversion_event",
+        event: "start",
+        fileSize: buffer.length,
+      },
+      "webp conversion started",
     );
-    logWebpConversionFailure(stage, error);
-    throw error;
-  }
 
-  const temp = await createTempPaths("webp");
+    let stage: WebpConversionStage = "validate_input";
+
+    if (!isWebpBuffer(buffer)) {
+      const error = new StickerConversionError(
+        "Envie um sticker WebP válido para converter.",
+        "invalid_webp_file",
+        stage,
+      );
+      logWebpConversionFailure(stage, error);
+      throw error;
+    }
+
+    const temp = await createTempPaths("webp");
   const framesDir = path.join(temp.dir, "frames");
   const concatFile = path.join(temp.dir, "frames.txt");
   const output = path.join(temp.dir, `${crypto.randomUUID()}.mp4`);
@@ -572,43 +579,45 @@ export async function animatedWebpToVideo(buffer: Buffer): Promise<Buffer> {
       "webp video encode completed",
     );
 
-    stage = "read_output";
-    const video = await fs.readFile(output);
-    logger.info(
-      {
-        type: "webp_conversion_event",
-        event: "success",
-        fileSize: buffer.length,
-        outputSize: video.length,
-        frameCount: frames.length,
-        totalDurationMs: Date.now() - startMs,
-      },
-      "webp conversion succeeded",
-    );
-    return video;
-  } catch (error) {
-    if (error instanceof StickerConversionError) {
-      logWebpConversionFailure(error.stage, error);
-      throw error;
-    }
+      stage = "read_output";
+      const video = await fs.readFile(output);
+      logger.info(
+        {
+          type: "webp_conversion_event",
+          event: "success",
+          fileSize: buffer.length,
+          outputSize: video.length,
+          frameCount: frames.length,
+          totalDurationMs: Date.now() - startMs,
+        },
+        "webp conversion succeeded",
+      );
+      return video;
+    } catch (error) {
+      if (error instanceof StickerConversionError) {
+        logWebpConversionFailure(error.stage, error);
+        throw error;
+      }
 
-    logWebpConversionFailure(stage, error);
-    throw new StickerConversionError(
-      "Não foi possível converter o sticker em vídeo.",
-      "webp_conversion_failed",
-      stage,
-    );
-  } finally {
-    await cleanup(temp.dir);
-  }
+      logWebpConversionFailure(stage, error);
+      throw new StickerConversionError(
+        "Não foi possível converter o sticker em vídeo.",
+        "webp_conversion_failed",
+        stage,
+      );
+    } finally {
+      await cleanup(temp.dir);
+    }
+  });
 }
 
 export async function webpToImage(buffer: Buffer): Promise<Buffer> {
-  const startMs = Date.now();
-  logger.info(
-    { type: "webp_conversion_event", event: "toimg_start", fileSize: buffer.length },
-    "webp to image started",
-  );
+  return conversionQueue.add(async () => {
+    const startMs = Date.now();
+    logger.info(
+      { type: "webp_conversion_event", event: "toimg_start", fileSize: buffer.length },
+      "webp to image started",
+    );
   if (!isWebpBuffer(buffer)) {
     throw new StickerConversionError(
       "Envie um sticker WebP válido para converter.",
@@ -636,57 +645,61 @@ export async function webpToImage(buffer: Buffer): Promise<Buffer> {
     return image;
   } catch (error) {
     logWebpConversionFailure("encode_video", error);
-    throw new StickerConversionError(
-      "Não foi possível converter o sticker em imagem.",
-      "webp_to_image_failed",
-      "encode_video",
-    );
-  } finally {
-    await cleanup(dir);
-  }
+      throw new StickerConversionError(
+        "Não foi possível converter o sticker em imagem.",
+        "webp_to_image_failed",
+        "encode_video",
+      );
+    } finally {
+      await cleanup(dir);
+    }
+  });
 }
 
 const PACK_NAME = "🤖 NeoRobot\n⤷ bot by S3NP41";
 
 const AUTHOR_TEMPLATE = (sender: string) => `⚡ Feita por\n⤷ ⋅ ${sender}`;
 export async function imageToSticker(buffer: Buffer, author: string): Promise<Buffer> {
-  const startMs = Date.now();
-  stickerLogger.info(
-    { type: "sticker_event", event: "image_start", inputSize: buffer.length },
-    "image sticker started",
-  );
-  const temp = await createTempPaths("png");
-
-  try {
-    await fs.writeFile(temp.input, buffer);
-    await runFfmpeg(ffmpeg(temp.input).outputOptions("-vf", "scale=512:512").output(temp.output));
-    const sticker = await fs.readFile(temp.output);
-    const out = await addStickerMetadata(sticker, PACK_NAME, AUTHOR_TEMPLATE(author));
+  return conversionQueue.add(async () => {
+    const startMs = Date.now();
     stickerLogger.info(
-      {
-        type: "sticker_event",
-        event: "image_success",
-        inputSize: buffer.length,
-        outputSize: out.length,
-        durationMs: Date.now() - startMs,
-      },
-      "image sticker succeeded",
+      { type: "sticker_event", event: "image_start", inputSize: buffer.length },
+      "image sticker started",
     );
-    return out;
-  } finally {
-    await cleanup(temp.dir);
-  }
+    const temp = await createTempPaths("png");
+
+    try {
+      await fs.writeFile(temp.input, buffer);
+      await runFfmpeg(ffmpeg(temp.input).outputOptions("-vf", "scale=512:512").output(temp.output));
+      const sticker = await fs.readFile(temp.output);
+      const out = await addStickerMetadata(sticker, PACK_NAME, AUTHOR_TEMPLATE(author));
+      stickerLogger.info(
+        {
+          type: "sticker_event",
+          event: "image_success",
+          inputSize: buffer.length,
+          outputSize: out.length,
+          durationMs: Date.now() - startMs,
+        },
+        "image sticker succeeded",
+      );
+      return out;
+    } finally {
+      await cleanup(temp.dir);
+    }
+  });
 }
 export async function videoToSticker(buffer: Buffer, author: string): Promise<Buffer> {
-  const startMs = Date.now();
-  stickerLogger.info(
-    { type: "sticker_event", event: "video_start", inputSize: buffer.length },
-    "video sticker started",
-  );
-  const temp = await createTempPaths("mp4");
+  return conversionQueue.add(async () => {
+    const startMs = Date.now();
+    stickerLogger.info(
+      { type: "sticker_event", event: "video_start", inputSize: buffer.length },
+      "video sticker started",
+    );
+    const temp = await createTempPaths("mp4");
 
-  try {
-    await fs.writeFile(temp.input, buffer);
+    try {
+      await fs.writeFile(temp.input, buffer);
 
     await runFfmpeg(
       ffmpeg(temp.input)
@@ -704,20 +717,21 @@ export async function videoToSticker(buffer: Buffer, author: string): Promise<Bu
         .output(temp.output),
     );
 
-    const sticker = await fs.readFile(temp.output);
-    const out = await addStickerMetadata(sticker, PACK_NAME, AUTHOR_TEMPLATE(author));
-    stickerLogger.info(
-      {
-        type: "sticker_event",
-        event: "video_success",
-        inputSize: buffer.length,
-        outputSize: out.length,
-        durationMs: Date.now() - startMs,
-      },
-      "video sticker succeeded",
-    );
-    return out;
-  } finally {
-    await cleanup(temp.dir);
-  }
+      const sticker = await fs.readFile(temp.output);
+      const out = await addStickerMetadata(sticker, PACK_NAME, AUTHOR_TEMPLATE(author));
+      stickerLogger.info(
+        {
+          type: "sticker_event",
+          event: "video_success",
+          inputSize: buffer.length,
+          outputSize: out.length,
+          durationMs: Date.now() - startMs,
+        },
+        "video sticker succeeded",
+      );
+      return out;
+    } finally {
+      await cleanup(temp.dir);
+    }
+  });
 }
