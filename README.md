@@ -20,11 +20,12 @@ O projeto é desenvolvido principalmente no **Termux (Android)**, mas pode ser e
 ## 🛠️ Stack
 
 - Node.js 24+
-- TypeScript
-- Baileys 7.x RC
+- TypeScript 5.x
+- Baileys 7.x RC (7.0.0-rc14)
 - better-sqlite3 + SQLite
 - ffmpeg + webpmux (conversão de mídia)
 - pino (logs estruturados)
+- Biome 2.5 (lint + format)
 
 ## ⚙️ Configuração
 
@@ -96,13 +97,16 @@ Pareamento: na primeira execução, se `WHATSAPP_PHONE_NUMBER` estiver definido,
 ## 📁 Estrutura do projeto
 
 ```text
-src/
-├── auth/        # Persistência SQLite (Baileys creds)
-├── commands/    # Controller + DB de grupos ativos
-├── events/      # Dispatcher e logger
-├── messages/    # Parser, tipos e reações
-├── utils/       # jid, logger, admin, sticker, metadataWebp
-└── index.ts     # Entrypoint + pareamento
+.
+├── biome.json   # Config Biome (formatter/linter)
+├── tsconfig.json
+└── src/
+    ├── auth/        # Persistência SQLite (Baileys creds)
+    ├── commands/    # Controller + DB de grupos ativos
+    ├── events/      # Dispatcher e logger
+    ├── messages/    # Parser, tipos e reações
+    ├── utils/       # jid, logger, admin, sticker, metadataWebp
+    └── index.ts     # Entrypoint + pareamento
 ```
 
 ## 📊 Logs
@@ -115,7 +119,7 @@ Logger centralizado em `src/utils/logger.ts` com `pino` (saída em `stdout` JSON
 - `module: sticker` → `sticker_event` (image/video_start/success)
 - `module: command` + `admin_event` → `ban/promote/demote/open/close`
 
-Para salvar em arquivo durante debug, redirecione a saída:
+Para salvar em arquivo durante debug, redirecione a saída (arquivo é ignorado no git):
 
 ```sh
 npm start 2>&1 | tee bot.log
@@ -123,6 +127,9 @@ npm start 2>&1 | tee bot.log
 grep 'module.*webp' bot.log
 grep 'admin_event' bot.log
 ```
+
+> [!NOTE]
+> `bot.log` e `*.log` estão no `.gitignore` — é só artefato local de debug.
 
 ## 📜 Scripts
 
@@ -134,6 +141,8 @@ grep 'admin_event' bot.log
 | `npm run typecheck` | Verifica os tipos sem gerar arquivos |
 | `npm run clean` | Remove o diretório `dist` |
 | `npm test` | Placeholder para futuros testes |
+| `npx biome check ./src` | Checa formatação + lint (Biome) |
+| `npx biome check --write ./src` | Formata e organiza imports |
 
 ## 🔧 Desenvolvimento
 
@@ -144,7 +153,8 @@ O projeto é desenvolvido e testado utilizando:
 - Termux
 - Node.js 24.x
 - TypeScript 5.x
-- Baileys 7.x RC
+- Baileys 7.x RC (7.0.0-rc14, 0 vulnerabilities)
+- Biome 2.5
 
 ### Dependências nativas
 
