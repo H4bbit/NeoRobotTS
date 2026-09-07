@@ -7,7 +7,6 @@ import {
   debugMessageContext,
   getParticipantRole,
   getTargetJid,
-  isBotAdmin,
   isBotJid,
   isParticipantAdmin,
 } from "../utils/admin.js";
@@ -276,15 +275,7 @@ export async function commandController(
     case "promote":
     case "promover":
     case "up": {
-      if (jidType !== "group") {
-        await sendReaction(sock, msg, "❓");
-        await sock.sendMessage(
-          jid,
-          { text: "Este comando só funciona em grupos." },
-          { quoted: msg },
-        );
-        break;
-      }
+      if (!(await requireGroup(sock, jid, msg as import("baileys").WAMessage, jidType))) break;
       const senderJid = msg.key.participant ?? msg.key.remoteJid!;
       const targetJid = await getTargetJid(sock, jid, msg);
       commandLogger.info(
@@ -312,15 +303,8 @@ export async function commandController(
         );
         break;
       }
-      if (!(await isBotAdmin(sock, jid))) {
-        await sendReaction(sock, msg, "❌");
-        await sock.sendMessage(
-          jid,
-          { text: "❌ Eu preciso ser admin para promover." },
-          { quoted: msg },
-        );
+      if (!(await requireBotAdmin(sock, jid, msg as import("baileys").WAMessage, "promover")))
         break;
-      }
       const targetRole = await getParticipantRole(sock, jid, targetJid);
       if (targetRole === "superadmin") {
         await sendReaction(sock, msg, "⚠️");
@@ -367,15 +351,7 @@ export async function commandController(
     case "demote":
     case "rebaixar":
     case "down": {
-      if (jidType !== "group") {
-        await sendReaction(sock, msg, "❓");
-        await sock.sendMessage(
-          jid,
-          { text: "Este comando só funciona em grupos." },
-          { quoted: msg },
-        );
-        break;
-      }
+      if (!(await requireGroup(sock, jid, msg as import("baileys").WAMessage, jidType))) break;
       const senderJid = msg.key.participant ?? msg.key.remoteJid!;
       const targetJid = await getTargetJid(sock, jid, msg);
       commandLogger.info(
@@ -406,15 +382,8 @@ export async function commandController(
         );
         break;
       }
-      if (!(await isBotAdmin(sock, jid))) {
-        await sendReaction(sock, msg, "❌");
-        await sock.sendMessage(
-          jid,
-          { text: "❌ Eu preciso ser admin para rebaixar." },
-          { quoted: msg },
-        );
+      if (!(await requireBotAdmin(sock, jid, msg as import("baileys").WAMessage, "rebaixar")))
         break;
-      }
       const targetRoleDemote = await getParticipantRole(sock, jid, targetJid);
       if (targetRoleDemote === "superadmin") {
         await sendReaction(sock, msg, "⚠️");
@@ -482,34 +451,11 @@ export async function commandController(
     }
     case "fechar":
     case "close": {
-      if (jidType !== "group") {
-        await sendReaction(sock, msg, "❓");
-        await sock.sendMessage(
-          jid,
-          { text: "Este comando só funciona em grupos." },
-          { quoted: msg },
-        );
+      if (!(await requireGroup(sock, jid, msg as import("baileys").WAMessage, jidType))) break;
+      const senderJid = await requireSenderAdmin(sock, jid, msg as import("baileys").WAMessage);
+      if (!senderJid) break;
+      if (!(await requireBotAdmin(sock, jid, msg as import("baileys").WAMessage, "fechar o grupo")))
         break;
-      }
-      const senderJid = msg.key.participant ?? msg.key.remoteJid!;
-      if (!(await isParticipantAdmin(sock, jid, senderJid))) {
-        await sendReaction(sock, msg, "❌");
-        await sock.sendMessage(
-          jid,
-          { text: "❌ Você precisa ser admin para usar este comando." },
-          { quoted: msg },
-        );
-        break;
-      }
-      if (!(await isBotAdmin(sock, jid))) {
-        await sendReaction(sock, msg, "❌");
-        await sock.sendMessage(
-          jid,
-          { text: "❌ Eu preciso ser admin para fechar o grupo." },
-          { quoted: msg },
-        );
-        break;
-      }
       try {
         await sock.groupSettingUpdate(jid, "announcement");
         await sendReaction(sock, msg, "✅");
@@ -531,15 +477,7 @@ export async function commandController(
     case "ban":
     case "banir":
     case "kick": {
-      if (jidType !== "group") {
-        await sendReaction(sock, msg, "❓");
-        await sock.sendMessage(
-          jid,
-          { text: "Este comando só funciona em grupos." },
-          { quoted: msg },
-        );
-        break;
-      }
+      if (!(await requireGroup(sock, jid, msg as import("baileys").WAMessage, jidType))) break;
       const senderJid = msg.key.participant ?? msg.key.remoteJid!;
       const targetJid = await getTargetJid(sock, jid, msg);
       commandLogger.info(
@@ -584,13 +522,7 @@ export async function commandController(
         );
         break;
       }
-      if (!(await isBotAdmin(sock, jid))) {
-        await sendReaction(sock, msg, "❌");
-        await sock.sendMessage(
-          jid,
-          { text: "❌ Eu preciso ser admin para banir." },
-          { quoted: msg },
-        );
+      if (!(await requireBotAdmin(sock, jid, msg as import("baileys").WAMessage, "banir"))) {
         commandLogger.info(
           { type: "admin_event", action: "ban_bot_not_admin", jid },
           "ban bot not admin",
