@@ -5,6 +5,7 @@ import {
   type CacheStore,
   DisconnectReason,
   fetchLatestBaileysVersion,
+  type GroupMetadata,
   makeCacheableSignalKeyStore,
   makeWASocket,
   proto,
@@ -19,6 +20,7 @@ import { parseMessage } from "./messages/parser.js";
 
 const logger = P({ level: "silent" });
 const msgRetryCounterCache = new NodeCache() as CacheStore;
+const groupCache = new NodeCache({ stdTTL: 5 * 60, useClones: false });
 
 async function getMessage(key: WAMessageKey): Promise<WAMessageContent | undefined> {
   return proto.Message.fromObject({});
@@ -48,8 +50,24 @@ const startSock = async () => {
       keys: makeCacheableSignalKeyStore(state.keys, logger),
     },
     msgRetryCounterCache,
+    cachedGroupMetadata: async (jid) => groupCache.get(jid) as GroupMetadata | undefined,
     generateHighQualityLinkPreview: true,
     getMessage,
+  });
+
+  // cache de groupMetadata recomendado pelo Baileys
+  sock.ev.on("groups.update", async ([event]) => {
+    if (!event?.id) return;
+    try {
+      const metadata = await sock.groupMetadata(event.id);
+      groupCache.set(event.id, metadata);
+    } catch {}
+  });
+  sock.ev.on("group-participants.update", async (event) => {
+    try {
+      const metadata = await sock.groupMetadata(event.id);
+      groupCache.set(event.id, metadata);
+    } catch {}
   });
 
   sock.ev.process(async (events) => {
