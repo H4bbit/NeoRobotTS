@@ -79,11 +79,15 @@ const startSock = async () => {
       const { connection, lastDisconnect } = events["connection.update"];
 
       if (connection === "close") {
-        const shouldReconnect =
-          (lastDisconnect?.error as Boom)?.output?.statusCode !== DisconnectReason.loggedOut;
-
+        const statusCode = (lastDisconnect?.error as Boom)?.output?.statusCode;
+        const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
+        console.log(`🔌 Conexão fechada (${statusCode ?? "sem código"}):`, lastDisconnect?.error?.message ?? lastDisconnect?.error);
         if (shouldReconnect) {
+          console.log("🔄 Reconectando em 3s...");
+          await sleep(3000);
           startSock();
+        } else {
+          console.log("❌ Deslogado — apague data/auth e pareie novamente");
         }
       }
 
@@ -107,31 +111,30 @@ const startSock = async () => {
     }
   });
 
-  // 🔐 Pairing
+  // 🔐 Pairing — não mata o bot, fica aguardando você parear (como antes do 19df7ea)
   if (!sock.authState.creds.registered) {
     console.log("\n⚠️ Aparelho não registrado.");
+    // não-bloqueante como no commit inicial d5d3686: deixa o loop de eventos rodar
+    setTimeout(async () => {
+      const phoneNumber = (process.env.WHATSAPP_PHONE_NUMBER || "").replace(/\D/g, "");
 
-    await sleep(3000);
+      if (!phoneNumber) {
+        console.log("❌ WHATSAPP_PHONE_NUMBER não definido — defina e reinicie");
+        console.log("   ex: WHATSAPP_PHONE_NUMBER=55... npm start");
+        return;
+      }
 
-    const phoneNumber = (process.env.WHATSAPP_PHONE_NUMBER || "").replace(/\D/g, "");
-
-    if (!phoneNumber) {
-      console.log("❌ WHATSAPP_PHONE_NUMBER não definido");
-      return;
-    }
-
-    try {
-      await sock.waitForSocketOpen();
-
-      const code = await sock.requestPairingCode(phoneNumber, undefined);
-
-      console.log(`\n✅ CÓDIGO DE PAREAMENTO: ${code?.match(/.{1,4}/g)?.join("-")}`);
-
-      console.log("Vá em: Aparelhos Conectados > Conectar com número de telefone\n");
-    } catch (err) {
-      console.error("Erro no pairing:", err);
-      process.exit(1);
-    }
+      try {
+        await sock.waitForSocketOpen();
+        const code = await sock.requestPairingCode(phoneNumber);
+        console.log(`\n✅ CÓDIGO DE PAREAMENTO: ${code?.match(/.{1,4}/g)?.join("-")}`);
+        console.log("Vá em: WhatsApp > Aparelhos Conectados > Conectar com número de telefone\n");
+        console.log("⏳ Aguardando pareamento... não feche o bot\n");
+      } catch (err) {
+        console.error("Erro no pairing (bot continua vivo, reconexão automática):", err);
+        // sem process.exit — o handler de connection.update acima vai reconectar
+      }
+    }, 3000);
   }
 };
 
