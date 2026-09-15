@@ -26,6 +26,18 @@ import {
 import { animatedWebpToVideoViaPillow } from "../utils/tovideoPillow.js";
 import { isGroupActive, setGroupActive } from "./db.js";
 import { requireBotAdmin, requireGroup, requireSenderAdmin } from "./helpers.js";
+import {
+  askBansos,
+  BANSOS_ALIVE_18,
+  checkRateLimit,
+  getAskModel,
+  getVisionModel,
+  VISION_PROMPT_DEFAULT,
+  visionBansos,
+} from "../utils/bansos.js";
+import { requireOwner } from "../utils/owner.js";
+import { downloadContentFromMessage, type proto } from "baileys";
+import { deleteAiConfig, getAiConfig, setAiConfig } from "./db.js";
 
 export async function commandController(
   sock: WASocket,
@@ -493,6 +505,143 @@ export async function commandController(
         );
         await sendReaction(sock, msg, "⚠️");
         await sock.sendMessage(jid, { text: "Não foi possível fechar o grupo." }, { quoted: msg });
+      }
+      break;
+    }
+    case "ask": {
+      const prompt = parts.slice(1).join(" ").trim();
+      if (!prompt) {
+        await sendReaction(sock, msg, "❓");
+        await sock.sendMessage(jid, { text: "Uso: !ask <pergunta>\nEx: !ask qual a capital do Brasil?" }, { quoted: msg });
+        break;
+      }
+      const rl = checkRateLimit(jid);
+      if (!rl.ok) {
+        await sendReaction(sock, msg, "⏳");
+        await sock.sendMessage(jid, { text: `⏳ Limite 200/h atingido. Tente em ${Math.ceil(rl.resetMs / 60000)} min.` }, { quoted: msg });
+        break;
+      }
+      await sendReaction(sock, msg, "🤔");
+      try {
+        const { text: answer } = await askBansos(prompt);
+        await sock.sendMessage(jid, { text: answer }, { quoted: msg });
+        await sendReaction(sock, msg, "✅");
+      } catch (error) {
+        const msgErr = error instanceof Error ? error.message : String(error);
+        commandLogger.error({ type: "ai_event", action: "ask_failed", jid, error: msgErr }, "ask failed");
+        await sendReaction(sock, msg, "⚠️");
+        await sock.sendMessage(jid, { text: `⚠️ Erro IA: ${msgErr.slice(0, 800)}` }, { quoted: msg });
+      }
+      break;
+    }
+    case "ialist": {
+      if (!(await requireOwner(sock, msg, jid))) break;
+      const curAsk = getAskModel();
+      const curVision = getVisionModel();
+      const lines = BANSOS_ALIVE_18.map((m, i) => {
+        const cur = m.id === curAsk ? " ★ ask" : m.id === curVision ? " ★ vision" : "";
+        const v = m.vision ? "👁️" : "  ";
+        const r = m.reasoning ? "🧠" : "  ";
+        return `${String(i + 1).padStart(2, " ")}. ${v}${r} ${m.id}${cur} — ${m.note}`;
+      });
+      const txt = `📋 *Modelos disponíveis*\n\n${lines.join("\n")}\n\n★ atual • 👁️ vision • 🧠 reasoning`;
+      await sock.sendMessage(jid, { text: txt }, { quoted: msg });
+      await sendReaction(sock, msg, "📋");
+      break;
+    }
+    case "iamodel": {
+      if (!(await requireOwner(sock, msg, jid))) break;
+      const args = parts.slice(1);
+      const curAsk = getAskModel();
+      const curVision = getVisionModel();
+      if (args.length === 0) {
+        await sock.sendMessage(
+          jid,
+          { text: `🤖 *Modelos atuais*\n• ask: \`${curAsk}\`\n• vision: \`${curVision}\`\n\nUse: !ialist pra ver os 18\n!iamodel <id> → ask\n!iamodel vision <id> → vision\n!iamodel reset` },
+          { quoted: msg },
+        );
+        break;
+      }
+      if (args[0] === "reset") {
+        deleteAiConfig("ask_model");
+        deleteAiConfig("vision_model");
+        await sock.sendMessage(jid, { text: `✅ Resetado\n• ask: \`kilo-auto/free\`\n• vision: \`muse-spark-1.2-contributor-free\`` }, { quoted: msg });
+        await sendReaction(sock, msg, "✅");
+        break;
+      }
+      let targetId: string;
+      let isVision = false;
+      if (args[0] === "vision") {
+        isVision = true;
+        targetId = args[1]?.trim() ?? "";
+        if (!targetId) {
+          await sock.sendMessage(jid, { text: "Uso: !iamodel vision <id>\nEx: !iamodel vision muse-spark-1.2-contributor-free" }, { quoted: msg });
+          break;
+        }
+      } else {
+        targetId = args[0]!.trim();
+      }
+      const found = BANSOS_ALIVE_18.find((m) => m.id === targetId);
+      if (!found) {
+        await sendReaction(sock, msg, "❌");
+        await sock.sendMessage(jid, { text: `❌ \`${targetId}\` não está entre os modelos disponíveis. Use !ialist` }, { quoted: msg });
+        break;
+      }
+      if (isVision && !found.vision) {
+        await sendReaction(sock, msg, "❌");
+        await sock.sendMessage(jid, { text: `❌ \`${targetId}\` não suporta imagem (sem 👁️). Escolha um com 👁️ no !ialist` }, { quoted: msg });
+        break;
+      }
+      if (isVision) {
+        setAiConfig("vision_model", targetId);
+        await sendReaction(sock, msg, "✅");
+        await sock.sendMessage(jid, { text: `✅ vision → \`${targetId}\`` }, { quoted: msg });
+      } else {
+        setAiConfig("ask_model", targetId);
+        await sendReaction(sock, msg, "✅");
+        await sock.sendMessage(jid, { text: `✅ ask → \`${targetId}\`` }, { quoted: msg });
+      }
+      break;
+    }
+    case "vision": {
+      // prompt obedecendo o comando: "!vision transcreva" ou "!vision descreva a roupa" ou só "!vision" (usa default)
+      const prompt = parts.slice(1).join(" ").trim() || VISION_PROMPT_DEFAULT;
+      // pega imagem: direta no msg atual ou quoted (reply)
+      const directImg = (msg.message?.imageMessage ?? null) as proto.Message.IImageMessage | null;
+      const quotedImg = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage?.imageMessage ?? null;
+      const imageMessage = directImg ?? quotedImg;
+      if (!imageMessage) {
+        await sendReaction(sock, msg, "❓");
+        await sock.sendMessage(
+          jid,
+          { text: "Uso: !vision [prompt]\nEnvie uma imagem com legenda !vision <prompt> ou responda uma imagem com !vision <prompt>\nEx: !vision transcreva o texto da imagem" },
+          { quoted: msg },
+        );
+        break;
+      }
+      const rl = checkRateLimit(jid);
+      if (!rl.ok) {
+        await sendReaction(sock, msg, "⏳");
+        await sock.sendMessage(jid, { text: `⏳ Limite 200/h atingido. Tente em ${Math.ceil(rl.resetMs / 60000)} min.` }, { quoted: msg });
+        break;
+      }
+      await sendReaction(sock, msg, "👁️");
+      try {
+        const stream = await downloadContentFromMessage(imageMessage, "image");
+        const chunks: Buffer[] = [];
+        for await (const chunk of stream) chunks.push(chunk as Buffer);
+        const buf = Buffer.concat(chunks);
+        const mime = (imageMessage.mimetype ?? "image/jpeg") as string;
+        const b64 = buf.toString("base64");
+        commandLogger.info({ type: "ai_event", action: "vision_start", jid, prompt: prompt.slice(0, 120), imageSize: buf.length, mime }, "vision start");
+        const { text: answer } = await visionBansos(b64, mime, prompt);
+        await sock.sendMessage(jid, { text: answer }, { quoted: msg });
+        await sendReaction(sock, msg, "✅");
+      } catch (error) {
+        const msgErr = error instanceof Error ? error.message : String(error);
+        commandLogger.error({ type: "ai_event", action: "vision_failed", jid, error: msgErr }, "vision failed");
+        await sendReaction(sock, msg, "⚠️");
+        await sock.sendMessage(jid, { text: `⚠️ Erro visão: ${msgErr.slice(0, 800)}` }, { quoted: msg });
       }
       break;
     }

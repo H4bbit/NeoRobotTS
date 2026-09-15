@@ -17,6 +17,14 @@ CREATE TABLE IF NOT EXISTS active_groups (
 );
 `);
 
+// AI config (owner adjustments)
+db.exec(`
+CREATE TABLE IF NOT EXISTS ai_config (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL
+);
+`);
+
 type ActiveGroupRow = { is_active: number };
 
 export function isGroupActive(jid: string): boolean {
@@ -70,4 +78,22 @@ export function removeGroup(jid: string): void {
     },
     "db delete",
   );
+}
+
+// AI config helpers
+export function getAiConfig(key: string): string | null {
+  const row = db.prepare("SELECT value FROM ai_config WHERE key = ?").get(key) as
+    | { value: string }
+    | undefined;
+  return row?.value ?? null;
+}
+
+export function setAiConfig(key: string, value: string): void {
+  db.prepare("INSERT OR REPLACE INTO ai_config (key, value) VALUES (?, ?)").run(key, value);
+  logger.info({ type: "db_event", action: "SET_AI_CONFIG", key, value }, "ai config set");
+}
+
+export function deleteAiConfig(key: string): void {
+  db.prepare("DELETE FROM ai_config WHERE key = ?").run(key);
+  logger.info({ type: "db_event", action: "DELETE_AI_CONFIG", key }, "ai config delete");
 }
