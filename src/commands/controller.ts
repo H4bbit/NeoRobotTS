@@ -26,6 +26,8 @@ import {
 import { animatedWebpToVideoViaPillow } from "../utils/tovideoPillow.js";
 import { isGroupActive, setGroupActive } from "./db.js";
 import { requireBotAdmin, requireGroup, requireSenderAdmin } from "./helpers.js";
+import { downloadMedia, extractViewOnce, sendRevealedMedia } from "../utils/media.js";
+import { requireOwner } from "../utils/owner.js";
 
 export async function commandController(
   sock: WASocket,
@@ -566,6 +568,37 @@ export async function commandController(
         );
         await sendReaction(sock, msg, "⚠️");
         await sock.sendMessage(jid, { text: "Não foi possível banir." }, { quoted: msg });
+      }
+      break;
+    }
+    case "reveal":
+    case "revelar": {
+      if (!(await requireOwner(sock, msg, jid))) break;
+      const ctx = msg.message?.extendedTextMessage?.contextInfo;
+      const quoted = ctx?.quotedMessage;
+      if (!quoted) {
+        await sendReaction(sock, msg, "❓");
+        await sock.sendMessage(jid, { text: "👁️ Responda a uma mídia de visualização única." }, { quoted: msg });
+        break;
+      }
+      const { image, video, audio } = extractViewOnce(quoted);
+      const mediaEntry = image ?? video ?? audio;
+      const mediaType = image ? "image" : video ? "video" : audio ? "audio" : null;
+      if (!mediaEntry || !mediaType) {
+        await sendReaction(sock, msg, "❓");
+        await sock.sendMessage(jid, { text: "Nenhuma mídia de visualização única encontrada." }, { quoted: msg });
+        break;
+      }
+      try {
+        await sendRevealedMedia(sock, jid, msg, mediaType, mediaEntry, "\n\n👁️ *REVELADO*");
+        await sendReaction(sock, msg, "✅");
+      } catch (error) {
+        commandLogger.error(
+          { type: "media_event", action: "reveal_failed", jid, error: error instanceof Error ? error.message : String(error) },
+          "reveal failed",
+        );
+        await sendReaction(sock, msg, "⚠️");
+        await sock.sendMessage(jid, { text: "⚠️ Erro ao revelar a mídia." }, { quoted: msg });
       }
       break;
     }
