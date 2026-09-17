@@ -25,7 +25,7 @@ import {
 } from "../utils/sticker.js";
 import { animatedWebpToVideoViaPillow } from "../utils/tovideoPillow.js";
 import { isGroupActive, setGroupActive } from "./db.js";
-import { requireBotAdmin, requireGroup, requireSenderAdmin } from "./helpers.js";
+import { reply, requireBotAdmin, requireGroup, requireSenderAdmin } from "./helpers.js";
 import {
   askBansos,
   BANSOS_ALIVE_18,
@@ -83,32 +83,14 @@ export async function commandController(
 
   switch (command) {
     case "ping": {
-      await sendReaction(sock, msg, "🏓");
-      await sock.sendMessage(
-        jid,
-        {
-          text: "Pong 🏓",
-        },
-        {
-          quoted: msg,
-        },
-      );
+      await reply(sock, jid, msg, "🏓", "Pong 🏓");
       break;
     }
 
     case "boton": {
       if (jidType === "group") {
         setGroupActive(jid, true);
-        await sendReaction(sock, msg, "✅");
-        await sock.sendMessage(
-          jid,
-          {
-            text: "✅ Bot ativado neste grupo",
-          },
-          {
-            quoted: msg,
-          },
-        );
+        await reply(sock, jid, msg, "✅", "✅ Bot ativado neste grupo");
       }
       break;
     }
@@ -116,16 +98,7 @@ export async function commandController(
     case "botoff": {
       if (jidType === "group") {
         setGroupActive(jid, false);
-        await sendReaction(sock, msg, "❌");
-        await sock.sendMessage(
-          jid,
-          {
-            text: "❌ Bot desativado neste grupo",
-          },
-          {
-            quoted: msg,
-          },
-        );
+        await reply(sock, jid, msg, "❌", "❌ Bot desativado neste grupo");
       }
       break;
     }
@@ -133,16 +106,7 @@ export async function commandController(
       const media = getWebpStickerMedia(msg);
 
       if (!media) {
-        await sendReaction(sock, msg, "❓");
-        await sock.sendMessage(
-          jid,
-          {
-            text: "Marque ou responda um sticker.",
-          },
-          {
-            quoted: msg,
-          },
-        );
+        await reply(sock, jid, msg, "❓", "Marque ou responda um sticker.");
         break;
       }
 
@@ -181,24 +145,14 @@ export async function commandController(
             ? error.message
             : "Não foi possível converter o sticker em vídeo.";
 
-        await sendReaction(sock, msg, "⚠️");
-        await sock.sendMessage(
-          jid,
-          {
-            text,
-          },
-          {
-            quoted: msg,
-          },
-        );
+        await reply(sock, jid, msg, "⚠️", text);
       }
       break;
     }
     case "tovideo2": {
       const media = getWebpStickerMedia(msg);
       if (!media) {
-        await sendReaction(sock, msg, "❓");
-        await sock.sendMessage(jid, { text: "Marque ou responda um sticker." }, { quoted: msg });
+        await reply(sock, jid, msg, "❓", "Marque ou responda um sticker.");
         break;
       }
       try {
@@ -218,8 +172,7 @@ export async function commandController(
     case "toimg": {
       const media = getWebpStickerMedia(msg);
       if (!media) {
-        await sendReaction(sock, msg, "❓");
-        await sock.sendMessage(jid, { text: "Marque ou responda um sticker." }, { quoted: msg });
+        await reply(sock, jid, msg, "❓", "Marque ou responda um sticker.");
         break;
       }
       try {
@@ -256,32 +209,14 @@ export async function commandController(
       const media = getStickerMedia(msg);
 
       if (!media) {
-        await sendReaction(sock, msg, "❓");
-        await sock.sendMessage(
-          jid,
-          {
-            text: "Marque ou responda uma imagem ou vídeo.",
-          },
-          {
-            quoted: msg,
-          },
-        );
+        await reply(sock, jid, msg, "❓", "Marque ou responda uma imagem ou vídeo.");
         break;
       }
       if (media.type === "video") {
         const seconds = getStickerDuration(msg);
 
         if (seconds !== null && seconds > 10) {
-          await sendReaction(sock, msg, "⚠️");
-          await sock.sendMessage(
-            jid,
-            {
-              text: "O vídeo deve ter no máximo 10 segundos.",
-            },
-            {
-              quoted: msg,
-            },
-          );
+          await reply(sock, jid, msg, "⚠️", "O vídeo deve ter no máximo 10 segundos.");
           break;
         }
       }
@@ -331,40 +266,27 @@ export async function commandController(
         "promote attempt",
       );
       if (targetJid && isBotJid(sock, targetJid)) {
-        await sendReaction(sock, msg, "❌");
-        await sock.sendMessage(jid, { text: "❌ Não posso me promover." }, { quoted: msg });
+        await reply(sock, jid, msg, "❌", "❌ Não posso me promover.");
         break;
       }
       if (!targetJid) {
-        await sendReaction(sock, msg, "❌");
-        await sock.sendMessage(
-          jid,
-          { text: "❌ Você precisa ser admin para usar este comando." },
-          { quoted: msg },
-        );
+        await reply(sock, jid, msg, "❌", "❌ Você precisa ser admin para usar este comando.");
         break;
       }
       if (!(await requireBotAdmin(sock, jid, msg as import("baileys").WAMessage, "promover")))
         break;
       const targetRole = await getParticipantRole(sock, jid, targetJid);
       if (targetRole === "superadmin") {
-        await sendReaction(sock, msg, "⚠️");
-        await sock.sendMessage(
-          jid,
-          { text: "⚠️ Não é possível promover/rebaixar o criador do grupo." },
-          { quoted: msg },
-        );
+        await reply(sock, jid, msg, "⚠️", "⚠️ Não é possível promover/rebaixar o criador do grupo.");
         break;
       }
       if (targetRole === "admin") {
-        await sendReaction(sock, msg, "ℹ️");
-        await sock.sendMessage(jid, { text: "ℹ️ Usuário já é admin." }, { quoted: msg });
+        await reply(sock, jid, msg, "ℹ️", "ℹ️ Usuário já é admin.");
         break;
       }
       try {
         await sock.groupParticipantsUpdate(jid, [targetJid], "promote");
-        await sendReaction(sock, msg, "✅");
-        await sock.sendMessage(jid, { text: "✅ Usuário promovido a admin" }, { quoted: msg });
+        await reply(sock, jid, msg, "✅", "✅ Usuário promovido a admin");
         commandLogger.info(
           { type: "admin_event", action: "promote", jid, targetJid, senderJid },
           "promote succeeded",
@@ -372,19 +294,13 @@ export async function commandController(
       } catch (error) {
         const isCreator = (error as unknown as { data?: number })?.data === 403;
         if (isCreator) {
-          await sendReaction(sock, msg, "⚠️");
-          await sock.sendMessage(
-            jid,
-            { text: "⚠️ Não é possível alterar o criador do grupo." },
-            { quoted: msg },
-          );
+          await reply(sock, jid, msg, "⚠️", "⚠️ Não é possível alterar o criador do grupo.");
         } else {
           commandLogger.error(
             { type: "admin_event", action: "promote_failed", jid, targetJid, error },
             "promote failed",
           );
-          await sendReaction(sock, msg, "⚠️");
-          await sock.sendMessage(jid, { text: "Não foi possível promover." }, { quoted: msg });
+          await reply(sock, jid, msg, "⚠️", "Não foi possível promover.");
         }
       }
       break;
@@ -407,43 +323,30 @@ export async function commandController(
         "demote attempt",
       );
       if (targetJid && isBotJid(sock, targetJid)) {
-        await sendReaction(sock, msg, "❌");
-        await sock.sendMessage(jid, { text: "❌ Não posso me rebaixar." }, { quoted: msg });
+        await reply(sock, jid, msg, "❌", "❌ Não posso me rebaixar.");
         break;
       }
       if (!targetJid) {
         break;
       }
       if (!(await isParticipantAdmin(sock, jid, senderJid))) {
-        await sendReaction(sock, msg, "❌");
-        await sock.sendMessage(
-          jid,
-          { text: "❌ Você precisa ser admin para usar este comando." },
-          { quoted: msg },
-        );
+        await reply(sock, jid, msg, "❌", "❌ Você precisa ser admin para usar este comando.");
         break;
       }
       if (!(await requireBotAdmin(sock, jid, msg as import("baileys").WAMessage, "rebaixar")))
         break;
       const targetRoleDemote = await getParticipantRole(sock, jid, targetJid);
       if (targetRoleDemote === "superadmin") {
-        await sendReaction(sock, msg, "⚠️");
-        await sock.sendMessage(
-          jid,
-          { text: "⚠️ Não é possível promover/rebaixar o criador do grupo." },
-          { quoted: msg },
-        );
+        await reply(sock, jid, msg, "⚠️", "⚠️ Não é possível promover/rebaixar o criador do grupo.");
         break;
       }
       if (targetRoleDemote === null) {
-        await sendReaction(sock, msg, "ℹ️");
-        await sock.sendMessage(jid, { text: "ℹ️ Usuário já não é admin." }, { quoted: msg });
+        await reply(sock, jid, msg, "ℹ️", "ℹ️ Usuário já não é admin.");
         break;
       }
       try {
         await sock.groupParticipantsUpdate(jid, [targetJid], "demote");
-        await sendReaction(sock, msg, "✅");
-        await sock.sendMessage(jid, { text: "✅ Usuário rebaixado" }, { quoted: msg });
+        await reply(sock, jid, msg, "✅", "✅ Usuário rebaixado");
         commandLogger.info(
           { type: "admin_event", action: "demote", jid, targetJid, senderJid },
           "demote succeeded",
@@ -451,19 +354,13 @@ export async function commandController(
       } catch (error) {
         const isCreator = (error as unknown as { data?: number })?.data === 403;
         if (isCreator) {
-          await sendReaction(sock, msg, "⚠️");
-          await sock.sendMessage(
-            jid,
-            { text: "⚠️ Não é possível alterar o criador do grupo." },
-            { quoted: msg },
-          );
+          await reply(sock, jid, msg, "⚠️", "⚠️ Não é possível alterar o criador do grupo.");
         } else {
           commandLogger.error(
             { type: "admin_event", action: "demote_failed", jid, targetJid, error },
             "demote failed",
           );
-          await sendReaction(sock, msg, "⚠️");
-          await sock.sendMessage(jid, { text: "Não foi possível rebaixar." }, { quoted: msg });
+          await reply(sock, jid, msg, "⚠️", "Não foi possível rebaixar.");
         }
       }
       break;
@@ -477,16 +374,14 @@ export async function commandController(
         break;
       try {
         await sock.groupSettingUpdate(jid, "not_announcement");
-        await sendReaction(sock, msg, "✅");
-        await sock.sendMessage(jid, { text: "✅ Grupo aberto" }, { quoted: msg });
+        await reply(sock, jid, msg, "✅", "✅ Grupo aberto");
         commandLogger.info({ type: "admin_event", action: "open", jid, senderJid }, "group opened");
       } catch (error) {
         commandLogger.error(
           { type: "admin_event", action: "open_failed", jid, error },
           "open failed",
         );
-        await sendReaction(sock, msg, "⚠️");
-        await sock.sendMessage(jid, { text: "Não foi possível abrir o grupo." }, { quoted: msg });
+        await reply(sock, jid, msg, "⚠️", "Não foi possível abrir o grupo.");
       }
       break;
     }
@@ -499,8 +394,7 @@ export async function commandController(
         break;
       try {
         await sock.groupSettingUpdate(jid, "announcement");
-        await sendReaction(sock, msg, "✅");
-        await sock.sendMessage(jid, { text: "✅ Grupo fechado" }, { quoted: msg });
+        await reply(sock, jid, msg, "✅", "✅ Grupo fechado");
         commandLogger.info(
           { type: "admin_event", action: "close", jid, senderJid },
           "group closed",
@@ -510,22 +404,19 @@ export async function commandController(
           { type: "admin_event", action: "close_failed", jid, error },
           "close failed",
         );
-        await sendReaction(sock, msg, "⚠️");
-        await sock.sendMessage(jid, { text: "Não foi possível fechar o grupo." }, { quoted: msg });
+        await reply(sock, jid, msg, "⚠️", "Não foi possível fechar o grupo.");
       }
       break;
     }
     case "ask": {
       const prompt = parts.slice(1).join(" ").trim();
       if (!prompt) {
-        await sendReaction(sock, msg, "❓");
-        await sock.sendMessage(jid, { text: "Uso: !ask <pergunta>\nEx: !ask qual a capital do Brasil?" }, { quoted: msg });
+        await reply(sock, jid, msg, "❓", "Uso: !ask <pergunta>\nEx: !ask qual a capital do Brasil?");
         break;
       }
       const rl = checkRateLimit(jid);
       if (!rl.ok) {
-        await sendReaction(sock, msg, "⏳");
-        await sock.sendMessage(jid, { text: `⏳ Limite 200/h atingido. Tente em ${Math.ceil(rl.resetMs / 60000)} min.` }, { quoted: msg });
+        await reply(sock, jid, msg, "⏳", `⏳ Limite 200/h atingido. Tente em ${Math.ceil(rl.resetMs / 60000)} min.`);
         break;
       }
       await sendReaction(sock, msg, "🤔");
@@ -539,8 +430,7 @@ export async function commandController(
         // mensagens de bansos.ts já são seguras (sem raw/reasoning). "Resposta truncada" agora é neutra, sem culpar user.
         const isKnown = rawErr.startsWith("IA ") || rawErr.startsWith("Resposta ");
         const userMsg = isKnown ? rawErr : "Não consegui gerar resposta. Tente novamente.";
-        await sendReaction(sock, msg, "⚠️");
-        await sock.sendMessage(jid, { text: `⚠️ ${userMsg}` }, { quoted: msg });
+        await reply(sock, jid, msg, "⚠️", `⚠️ ${userMsg}`);
       }
       break;
     }
@@ -588,24 +478,20 @@ export async function commandController(
         }
         target = Number.parseInt(v, 10);
         if (!Number.isFinite(target) || target < 100 || target > 8000) {
-          await sendReaction(sock, msg, "❌");
-          await sock.sendMessage(jid, { text: `❌ vision: 100-8000` }, { quoted: msg });
+          await reply(sock, jid, msg, "❌", `❌ vision: 100-8000`);
           break;
         }
         setAiConfig("vision_tokens", String(target));
-        await sendReaction(sock, msg, "✅");
-        await sock.sendMessage(jid, { text: `✅ vision tokens → \`${target}\`` }, { quoted: msg });
+        await reply(sock, jid, msg, "✅", `✅ vision tokens → \`${target}\``);
       } else {
         const v = args[0]!.trim();
         target = Number.parseInt(v, 10);
         if (!Number.isFinite(target) || target < 10 || target > 4000) {
-          await sendReaction(sock, msg, "❌");
-          await sock.sendMessage(jid, { text: `❌ ask: 10-4000` }, { quoted: msg });
+          await reply(sock, jid, msg, "❌", `❌ ask: 10-4000`);
           break;
         }
         setAiConfig("ask_tokens", String(target));
-        await sendReaction(sock, msg, "✅");
-        await sock.sendMessage(jid, { text: `✅ ask tokens → \`${target}\`` }, { quoted: msg });
+        await reply(sock, jid, msg, "✅", `✅ ask tokens → \`${target}\``);
       }
       break;
     }
@@ -643,23 +529,19 @@ export async function commandController(
       }
       const found = BANSOS_ALIVE_18.find((m) => m.id === targetId);
       if (!found) {
-        await sendReaction(sock, msg, "❌");
-        await sock.sendMessage(jid, { text: `❌ \`${targetId}\` não está entre os modelos disponíveis. Use !ialist` }, { quoted: msg });
+        await reply(sock, jid, msg, "❌", `❌ \`${targetId}\` não está entre os modelos disponíveis. Use !ialist`);
         break;
       }
       if (isVision && !found.vision) {
-        await sendReaction(sock, msg, "❌");
-        await sock.sendMessage(jid, { text: `❌ \`${targetId}\` não suporta imagem (sem 👁️). Escolha um com 👁️ no !ialist` }, { quoted: msg });
+        await reply(sock, jid, msg, "❌", `❌ \`${targetId}\` não suporta imagem (sem 👁️). Escolha um com 👁️ no !ialist`);
         break;
       }
       if (isVision) {
         setAiConfig("vision_model", targetId);
-        await sendReaction(sock, msg, "✅");
-        await sock.sendMessage(jid, { text: `✅ vision → \`${targetId}\`` }, { quoted: msg });
+        await reply(sock, jid, msg, "✅", `✅ vision → \`${targetId}\``);
       } else {
         setAiConfig("ask_model", targetId);
-        await sendReaction(sock, msg, "✅");
-        await sock.sendMessage(jid, { text: `✅ ask → \`${targetId}\`` }, { quoted: msg });
+        await reply(sock, jid, msg, "✅", `✅ ask → \`${targetId}\``);
       }
       break;
     }
@@ -671,18 +553,12 @@ export async function commandController(
       const quotedImg = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage?.imageMessage ?? null;
       const imageMessage = directImg ?? quotedImg;
       if (!imageMessage) {
-        await sendReaction(sock, msg, "❓");
-        await sock.sendMessage(
-          jid,
-          { text: "Uso: !vision [prompt]\nEnvie uma imagem com legenda !vision <prompt> ou responda uma imagem com !vision <prompt>\nEx: !vision transcreva o texto da imagem" },
-          { quoted: msg },
-        );
+        await reply(sock, jid, msg, "❓", "Uso: !vision [prompt]\nEnvie uma imagem com legenda !vision <prompt> ou responda uma imagem com !vision <prompt>\nEx: !vision transcreva o texto da imagem");
         break;
       }
       const rl = checkRateLimit(jid);
       if (!rl.ok) {
-        await sendReaction(sock, msg, "⏳");
-        await sock.sendMessage(jid, { text: `⏳ Limite 200/h atingido. Tente em ${Math.ceil(rl.resetMs / 60000)} min.` }, { quoted: msg });
+        await reply(sock, jid, msg, "⏳", `⏳ Limite 200/h atingido. Tente em ${Math.ceil(rl.resetMs / 60000)} min.`);
         break;
       }
       await sendReaction(sock, msg, "👁️");
@@ -701,8 +577,7 @@ export async function commandController(
         const rawErr = error instanceof Error ? error.message : String(error);
         commandLogger.error({ type: "ai_event", action: "vision_failed", jid, error: rawErr }, "vision failed");
         const userMsg = rawErr.startsWith("Visão ") || rawErr.startsWith("IA ") ? rawErr : "Não consegui analisar a imagem. Tente novamente.";
-        await sendReaction(sock, msg, "⚠️");
-        await sock.sendMessage(jid, { text: `⚠️ ${userMsg}` }, { quoted: msg });
+        await reply(sock, jid, msg, "⚠️", `⚠️ ${userMsg}`);
       }
       break;
     }
@@ -724,17 +599,11 @@ export async function commandController(
         "ban attempt",
       );
       if (targetJid && isBotJid(sock, targetJid)) {
-        await sendReaction(sock, msg, "❌");
-        await sock.sendMessage(jid, { text: "❌ Não posso me banir." }, { quoted: msg });
+        await reply(sock, jid, msg, "❌", "❌ Não posso me banir.");
         break;
       }
       if (!targetJid) {
-        await sendReaction(sock, msg, "❓");
-        await sock.sendMessage(
-          jid,
-          { text: "Marque ou responda alguém para banir. Ex: !ban @usuario" },
-          { quoted: msg },
-        );
+        await reply(sock, jid, msg, "❓", "Marque ou responda alguém para banir. Ex: !ban @usuario");
         commandLogger.info(
           { type: "admin_event", action: "ban_no_target", jid, senderJid },
           "ban no target",
@@ -742,12 +611,7 @@ export async function commandController(
         break;
       }
       if (!(await isParticipantAdmin(sock, jid, senderJid))) {
-        await sendReaction(sock, msg, "❌");
-        await sock.sendMessage(
-          jid,
-          { text: "❌ Você precisa ser admin para usar este comando." },
-          { quoted: msg },
-        );
+        await reply(sock, jid, msg, "❌", "❌ Você precisa ser admin para usar este comando.");
         commandLogger.info(
           { type: "admin_event", action: "ban_sender_not_admin", jid, senderJid },
           "ban sender not admin",
@@ -763,8 +627,7 @@ export async function commandController(
       }
       try {
         await sock.groupParticipantsUpdate(jid, [targetJid], "remove");
-        await sendReaction(sock, msg, "✅");
-        await sock.sendMessage(jid, { text: "✅ Usuário banido" }, { quoted: msg });
+        await reply(sock, jid, msg, "✅", "✅ Usuário banido");
         commandLogger.info(
           { type: "admin_event", action: "ban", jid, targetJid, senderJid },
           "ban succeeded",
@@ -774,8 +637,7 @@ export async function commandController(
           { type: "admin_event", action: "ban_failed", jid, targetJid, error },
           "ban failed",
         );
-        await sendReaction(sock, msg, "⚠️");
-        await sock.sendMessage(jid, { text: "Não foi possível banir." }, { quoted: msg });
+        await reply(sock, jid, msg, "⚠️", "Não foi possível banir.");
       }
       break;
     }
@@ -785,16 +647,14 @@ export async function commandController(
       const ctx = msg.message?.extendedTextMessage?.contextInfo;
       const quoted = ctx?.quotedMessage;
       if (!quoted) {
-        await sendReaction(sock, msg, "❓");
-        await sock.sendMessage(jid, { text: "👁️ Responda a uma mídia de visualização única." }, { quoted: msg });
+        await reply(sock, jid, msg, "❓", "👁️ Responda a uma mídia de visualização única.");
         break;
       }
       const { image, video, audio } = extractViewOnce(quoted);
       const mediaEntry = image ?? video ?? audio;
       const mediaType = image ? "image" : video ? "video" : audio ? "audio" : null;
       if (!mediaEntry || !mediaType) {
-        await sendReaction(sock, msg, "❓");
-        await sock.sendMessage(jid, { text: "Nenhuma mídia de visualização única encontrada." }, { quoted: msg });
+        await reply(sock, jid, msg, "❓", "Nenhuma mídia de visualização única encontrada.");
         break;
       }
       try {
@@ -805,8 +665,7 @@ export async function commandController(
           { type: "media_event", action: "reveal_failed", jid, error: error instanceof Error ? error.message : String(error) },
           "reveal failed",
         );
-        await sendReaction(sock, msg, "⚠️");
-        await sock.sendMessage(jid, { text: "⚠️ Erro ao revelar a mídia." }, { quoted: msg });
+        await reply(sock, jid, msg, "⚠️", "⚠️ Erro ao revelar a mídia.");
       }
       break;
     }
