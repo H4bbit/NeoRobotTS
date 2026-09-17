@@ -195,7 +195,7 @@ export async function askBansos(prompt: string, maxTokens = getAskTokens()): Pro
 }
 
 // ── Vision ──
-export const VISION_MODEL = "muse-spark-1.2-contributor-free";
+export const VISION_MODEL = "stepfun/step-3.7-flash:free";
 export const VISION_MAX_TOKENS = 2500;
 export const VISION_PROMPT_DEFAULT =
   "Descreva esta imagem em detalhes em português. Foque em: personagem, roupa, pose, expressões, cenário e texto visível. Seja factual e objetivo.";
@@ -210,22 +210,22 @@ export async function visionBansos(
   const dataUrl = `data:${mime};base64,${imageB64}`;
   const body = JSON.stringify({
     model,
-    input: [
+    messages: [
       {
         role: "user",
         content: [
-          { type: "input_text", text: prompt },
-          { type: "input_image", image_url: dataUrl },
+          { type: "text", text: prompt },
+          { type: "image_url", image_url: { url: dataUrl } },
         ],
       },
     ],
-    max_output_tokens: maxTokens,
+    max_tokens: maxTokens,
     stream: false,
   });
   const start = Date.now();
-  const r = await fetch(`${API_OPENCODE}/responses`, {
+  const r = await fetch(KILO_CHAT_URL, {
     method: "POST",
-    headers: opencodeHeaders(),
+    headers: kiloHeaders(),
     body,
     signal: AbortSignal.timeout(90_000),
   });
@@ -239,9 +239,7 @@ export async function visionBansos(
     throw new Error("Visão resposta inválida. Tente novamente.");
   }
   const j = json as {
-    output_text?: string;
-    output?: Array<{ type: string; content?: Array<{ text?: string }> }>;
-    status?: string;
+    choices?: Array<{ message?: { content?: string }; finish_reason?: string }>;
     usage?: unknown;
     error?: { message?: string };
   };
@@ -249,14 +247,13 @@ export async function visionBansos(
     commandLogger.error({ type: "ai_event", action: "vision_api_error", status: r.status, body: j, raw: raw.slice(0, 1000) }, "vision api error");
     throw new Error("Visão indisponível no momento. Tente novamente.");
   }
-  const text =
-    (j.output_text ?? j.output?.find((x) => x.type === "message")?.content?.[0]?.text ?? "").trim();
+  const text = j.choices?.[0]?.message?.content ?? "";
   if (!text) {
-    commandLogger.error({ type: "ai_event", action: "vision_empty_content", model, status: j.status, raw: raw.slice(0, 2000) }, "vision empty content");
+    commandLogger.error({ type: "ai_event", action: "vision_empty_content", model, status: r.status, raw: raw.slice(0, 2000) }, "vision empty content");
     throw new Error("Visão não retornou conteúdo. Tente novamente com outra imagem ou prompt.");
   }
   commandLogger.info(
-    { type: "ai_event", model, elapsed, status: j.status, usage: j.usage },
+    { type: "ai_event", model, elapsed, status: r.status, usage: j.usage },
     "vision succeeded",
   );
   return { text, model, usage: j.usage };
