@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { getAiConfig } from "../commands/db.js";
 import { commandLogger } from "./logger.js";
 
 // ── Upstreams ──
@@ -51,8 +52,10 @@ export function checkRateLimit(jid: string): { ok: boolean; remaining: number; r
 }
 
 // ── Modelos ──
+// defaults mockados coerentes (testado: trava-língua não trunca com 1400)
+// ask: reasoning leve + vision, não come 1k de thinking como stepfun
 export const ASK_MODEL = "kilo-auto/free";
-export const ASK_MAX_TOKENS = 600;
+export const ASK_MAX_TOKENS = 1400;
 export type BansosModel = {
   id: string;
   vision: boolean;
@@ -65,7 +68,7 @@ export const BANSOS_ALIVE_18: BansosModel[] = [
   { id: "mimo-v2.5-free", vision: true, reasoning: true, note: "200K" },
   { id: "ling-3.0-flash-fin-free", vision: false, reasoning: true, note: "262K" },
   { id: "big-pickle", vision: false, reasoning: true, note: "200K" },
-  { id: "kilo-auto/free", vision: false, reasoning: false, note: "256K s/ reasoning" },
+  { id: "kilo-auto/free", vision: false, reasoning: false, note: "256K rápido s/ reasoning" },
   { id: "stepfun/step-3.7-flash:free", vision: true, reasoning: true, note: "vision 262K" },
   { id: "nvidia/nemotron-3-ultra-550b-a55b:free", vision: false, reasoning: true, note: "1M" },
   { id: "nvidia/nemotron-3-super-120b-a12b:free", vision: false, reasoning: true, note: "262K" },
@@ -82,7 +85,6 @@ export const BANSOS_ALIVE_18: BansosModel[] = [
 
 function getCurrentAskModel(): string {
   try {
-    const { getAiConfig } = require("../commands/db.js") as typeof import("../commands/db.js");
     return getAiConfig("ask_model") ?? ASK_MODEL;
   } catch {
     return ASK_MODEL;
@@ -90,7 +92,6 @@ function getCurrentAskModel(): string {
 }
 function getCurrentVisionModel(): string {
   try {
-    const { getAiConfig } = require("../commands/db.js") as typeof import("../commands/db.js");
     return getAiConfig("vision_model") ?? VISION_MODEL;
   } catch {
     return VISION_MODEL;
@@ -99,7 +100,33 @@ function getCurrentVisionModel(): string {
 export function getAskModel(): string { return getCurrentAskModel(); }
 export function getVisionModel(): string { return getCurrentVisionModel(); }
 
-export async function askBansos(prompt: string, maxTokens = ASK_MAX_TOKENS): Promise<{ text: string; model: string; usage?: unknown }> {
+export const ASK_TOKENS_MIN = 10;
+export const ASK_TOKENS_MAX = 4000;
+export const VISION_TOKENS_MIN = 100;
+export const VISION_TOKENS_MAX = 8000;
+
+export function getAskTokens(): number {
+  try {
+    const v = getAiConfig("ask_tokens");
+    const n = v ? Number.parseInt(v, 10) : NaN;
+    if (!Number.isFinite(n)) return ASK_MAX_TOKENS;
+    return Math.min(ASK_TOKENS_MAX, Math.max(ASK_TOKENS_MIN, n));
+  } catch {
+    return ASK_MAX_TOKENS;
+  }
+}
+export function getVisionTokens(): number {
+  try {
+    const v = getAiConfig("vision_tokens");
+    const n = v ? Number.parseInt(v, 10) : NaN;
+    if (!Number.isFinite(n)) return VISION_MAX_TOKENS;
+    return Math.min(VISION_TOKENS_MAX, Math.max(VISION_TOKENS_MIN, n));
+  } catch {
+    return VISION_MAX_TOKENS;
+  }
+}
+
+export async function askBansos(prompt: string, maxTokens = getAskTokens()): Promise<{ text: string; model: string; usage?: unknown }> {
   const model = getCurrentAskModel();
   const body = JSON.stringify({
     model,
@@ -123,7 +150,8 @@ export async function askBansos(prompt: string, maxTokens = ASK_MAX_TOKENS): Pro
   try {
     json = JSON.parse(raw);
   } catch {
-    throw new Error(`kilo invalid json ${r.status}: ${raw.slice(0, 500)}`);
+    commandLogger.error({ type: "ai_event", action: "ask_invalid_json", status: r.status, raw: raw.slice(0, 1000) }, "kilo invalid json");
+    throw new Error("IA resposta inválida. Tente novamente.");
   }
 
   const j = json as {
@@ -133,12 +161,30 @@ export async function askBansos(prompt: string, maxTokens = ASK_MAX_TOKENS): Pro
   };
 
   if (!r.ok) {
-    const msg = j.error?.message ?? raw.slice(0, 800);
-    throw new Error(`kilo ${r.status}: ${msg}`);
+    commandLogger.error({ type: "ai_event", action: "ask_api_error", status: r.status, body: j, raw: raw.slice(0, 1000) }, "kilo api error");
+    throw new Error("IA indisponível no momento. Tente novamente.");
   }
 
-  const content = j.choices?.[0]?.message?.content ?? "";
-  if (!content) throw new Error(`kilo empty content finish=${j.choices?.[0]?.finish_reason} raw=${raw.slice(0, 800)}`);
+  const rawContent = j.choices?.[0]?.message?.content ?? "";
+  const content = rawContent.trim();
+  const finish = j.choices?.[0]?.finish_reason;
+  if (!content) {
+    commandLogger.error({ type: "ai_event", action: "ask_empty_content", model, finish, raw: raw.slice(0, 2000) }, "kilo empty content");
+    if (finish === "length") {
+      // reasoning consumiu o limite e não sobrou pra content — retry automático com mais tokens (não culpa o user)
+      if (maxTokens < ASK_TOKENS_MAX) {
+        const retryTokens = Math.min(ASK_TOKENS_MAX, maxTokens + 1000);
+        commandLogger.warn({ type: "ai_event", action: "ask_retry_length", model, from: maxTokens, to: retryTokens }, "retry ask on length");
+        return askBansos(prompt, retryTokens);
+      }
+      throw new Error("Resposta truncada por limite de tokens.");
+    }
+    throw new Error("IA não retornou conteúdo. Tente reformular a pergunta.");
+  }
+  // se veio truncado mas tem conteúdo, entrega o que tem (não é erro) — só loga
+  if (finish === "length" && content) {
+    commandLogger.warn({ type: "ai_event", action: "ask_truncated", model, finish, contentLen: content.length }, "ask truncated but delivering");
+  }
 
   commandLogger.info(
     { type: "ai_event", model, elapsed, finish: j.choices?.[0]?.finish_reason, usage: j.usage },
@@ -160,6 +206,7 @@ export async function visionBansos(
   prompt: string,
 ): Promise<{ text: string; model: string; usage?: unknown }> {
   const model = getCurrentVisionModel();
+  const maxTokens = getVisionTokens();
   const dataUrl = `data:${mime};base64,${imageB64}`;
   const body = JSON.stringify({
     model,
@@ -172,7 +219,7 @@ export async function visionBansos(
         ],
       },
     ],
-    max_output_tokens: VISION_MAX_TOKENS,
+    max_output_tokens: maxTokens,
     stream: false,
   });
   const start = Date.now();
@@ -188,7 +235,8 @@ export async function visionBansos(
   try {
     json = JSON.parse(raw);
   } catch {
-    throw new Error(`vision invalid json ${r.status}: ${raw.slice(0, 800)}`);
+    commandLogger.error({ type: "ai_event", action: "vision_invalid_json", status: r.status, raw: raw.slice(0, 1000) }, "vision invalid json");
+    throw new Error("Visão resposta inválida. Tente novamente.");
   }
   const j = json as {
     output_text?: string;
@@ -197,10 +245,16 @@ export async function visionBansos(
     usage?: unknown;
     error?: { message?: string };
   };
-  if (!r.ok) throw new Error(`vision ${r.status}: ${j.error?.message ?? raw.slice(0, 800)}`);
+  if (!r.ok) {
+    commandLogger.error({ type: "ai_event", action: "vision_api_error", status: r.status, body: j, raw: raw.slice(0, 1000) }, "vision api error");
+    throw new Error("Visão indisponível no momento. Tente novamente.");
+  }
   const text =
-    j.output_text ?? j.output?.find((x) => x.type === "message")?.content?.[0]?.text ?? "";
-  if (!text) throw new Error(`vision empty status=${j.status} raw=${raw.slice(0, 800)}`);
+    (j.output_text ?? j.output?.find((x) => x.type === "message")?.content?.[0]?.text ?? "").trim();
+  if (!text) {
+    commandLogger.error({ type: "ai_event", action: "vision_empty_content", model, status: j.status, raw: raw.slice(0, 2000) }, "vision empty content");
+    throw new Error("Visão não retornou conteúdo. Tente novamente com outra imagem ou prompt.");
+  }
   commandLogger.info(
     { type: "ai_event", model, elapsed, status: j.status, usage: j.usage },
     "vision succeeded",

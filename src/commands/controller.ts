@@ -31,7 +31,13 @@ import {
   BANSOS_ALIVE_18,
   checkRateLimit,
   getAskModel,
+  ASK_MODEL,
+  ASK_MAX_TOKENS,
+  VISION_MAX_TOKENS,
+  VISION_MODEL,
+  getAskTokens,
   getVisionModel,
+  getVisionTokens,
   VISION_PROMPT_DEFAULT,
   visionBansos,
 } from "../utils/bansos.js";
@@ -527,10 +533,13 @@ export async function commandController(
         await sock.sendMessage(jid, { text: answer }, { quoted: msg });
         await sendReaction(sock, msg, "✅");
       } catch (error) {
-        const msgErr = error instanceof Error ? error.message : String(error);
-        commandLogger.error({ type: "ai_event", action: "ask_failed", jid, error: msgErr }, "ask failed");
+        const rawErr = error instanceof Error ? error.message : String(error);
+        commandLogger.error({ type: "ai_event", action: "ask_failed", jid, error: rawErr }, "ask failed");
+        // mensagens de bansos.ts já são seguras (sem raw/reasoning). "Resposta truncada" agora é neutra, sem culpar user.
+        const isKnown = rawErr.startsWith("IA ") || rawErr.startsWith("Resposta ");
+        const userMsg = isKnown ? rawErr : "Não consegui gerar resposta. Tente novamente.";
         await sendReaction(sock, msg, "⚠️");
-        await sock.sendMessage(jid, { text: `⚠️ Erro IA: ${msgErr.slice(0, 800)}` }, { quoted: msg });
+        await sock.sendMessage(jid, { text: `⚠️ ${userMsg}` }, { quoted: msg });
       }
       break;
     }
@@ -549,6 +558,56 @@ export async function commandController(
       await sendReaction(sock, msg, "📋");
       break;
     }
+    case "aitokens": {
+      if (!(await requireOwner(sock, msg, jid))) break;
+      const args = parts.slice(1);
+      const curAsk = getAskTokens();
+      const curVision = getVisionTokens();
+      if (args.length === 0) {
+        await sock.sendMessage(
+          jid,
+          { text: `🤖 *Tokens atuais*\n• ask: \`${curAsk}\`\n• vision: \`${curVision}\`\n\nUse: !aitokens <n> → ask\n!aitokens vision <n> → vision\n!aitokens reset` },
+          { quoted: msg },
+        );
+        break;
+      }
+      if (args[0] === "reset") {
+        deleteAiConfig("ask_tokens");
+        deleteAiConfig("vision_tokens");
+        await sock.sendMessage(jid, { text: `✅ Resetado\n• ask: \`${ASK_MAX_TOKENS}\`\n• vision: \`${VISION_MAX_TOKENS}\`` }, { quoted: msg });
+        await sendReaction(sock, msg, "✅");
+        break;
+      }
+      let target: number;
+      if (args[0] === "vision") {
+        const v = args[1]?.trim();
+        if (!v) {
+          await sock.sendMessage(jid, { text: "Uso: !aitokens vision <n>\nEx: !aitokens vision 3000" }, { quoted: msg });
+          break;
+        }
+        target = Number.parseInt(v, 10);
+        if (!Number.isFinite(target) || target < 100 || target > 8000) {
+          await sendReaction(sock, msg, "❌");
+          await sock.sendMessage(jid, { text: `❌ vision: 100-8000` }, { quoted: msg });
+          break;
+        }
+        setAiConfig("vision_tokens", String(target));
+        await sendReaction(sock, msg, "✅");
+        await sock.sendMessage(jid, { text: `✅ vision tokens → \`${target}\`` }, { quoted: msg });
+      } else {
+        const v = args[0]!.trim();
+        target = Number.parseInt(v, 10);
+        if (!Number.isFinite(target) || target < 10 || target > 4000) {
+          await sendReaction(sock, msg, "❌");
+          await sock.sendMessage(jid, { text: `❌ ask: 10-4000` }, { quoted: msg });
+          break;
+        }
+        setAiConfig("ask_tokens", String(target));
+        await sendReaction(sock, msg, "✅");
+        await sock.sendMessage(jid, { text: `✅ ask tokens → \`${target}\`` }, { quoted: msg });
+      }
+      break;
+    }
     case "iamodel": {
       if (!(await requireOwner(sock, msg, jid))) break;
       const args = parts.slice(1);
@@ -565,7 +624,7 @@ export async function commandController(
       if (args[0] === "reset") {
         deleteAiConfig("ask_model");
         deleteAiConfig("vision_model");
-        await sock.sendMessage(jid, { text: `✅ Resetado\n• ask: \`kilo-auto/free\`\n• vision: \`muse-spark-1.2-contributor-free\`` }, { quoted: msg });
+        await sock.sendMessage(jid, { text: `✅ Resetado\n• ask: \`${ASK_MODEL}\`\n• vision: \`${VISION_MODEL}\`` }, { quoted: msg });
         await sendReaction(sock, msg, "✅");
         break;
       }
@@ -638,10 +697,11 @@ export async function commandController(
         await sock.sendMessage(jid, { text: answer }, { quoted: msg });
         await sendReaction(sock, msg, "✅");
       } catch (error) {
-        const msgErr = error instanceof Error ? error.message : String(error);
-        commandLogger.error({ type: "ai_event", action: "vision_failed", jid, error: msgErr }, "vision failed");
+        const rawErr = error instanceof Error ? error.message : String(error);
+        commandLogger.error({ type: "ai_event", action: "vision_failed", jid, error: rawErr }, "vision failed");
+        const userMsg = rawErr.startsWith("Visão ") || rawErr.startsWith("IA ") ? rawErr : "Não consegui analisar a imagem. Tente novamente.";
         await sendReaction(sock, msg, "⚠️");
-        await sock.sendMessage(jid, { text: `⚠️ Erro visão: ${msgErr.slice(0, 800)}` }, { quoted: msg });
+        await sock.sendMessage(jid, { text: `⚠️ ${userMsg}` }, { quoted: msg });
       }
       break;
     }
