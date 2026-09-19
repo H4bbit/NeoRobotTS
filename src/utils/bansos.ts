@@ -1,25 +1,8 @@
-import { randomUUID } from "node:crypto";
 import { getAiConfig } from "../commands/db.js";
 import { commandLogger } from "./logger.js";
 
 // ── Upstreams ──
-export const UPSTREAM = "https://opencode.ai/zen";
-export const API_OPENCODE = `${UPSTREAM}/v1`;
 export const KILO_CHAT_URL = "https://api.kilo.ai/api/gateway/chat/completions";
-
-const OPENCODE_USER_AGENT = "opencode/latest/1.14.50/cli";
-const OPENCODE_SESSION = randomUUID();
-
-export function opencodeHeaders(): Record<string, string> {
-  return {
-    "User-Agent": OPENCODE_USER_AGENT,
-    "x-opencode-client": "cli",
-    "x-opencode-project": "default",
-    "x-opencode-session": OPENCODE_SESSION,
-    "x-opencode-request": randomUUID(),
-    "Content-Type": "application/json",
-  };
-}
 
 export function kiloHeaders(): Record<string, string> {
   return {
