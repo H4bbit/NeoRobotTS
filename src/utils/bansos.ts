@@ -183,6 +183,27 @@ function sseTextOf(value: unknown): string {
   return typeof value === "string" && value ? value : "";
 }
 
+type BlockedErrorBody = { error?: { message?: unknown }; message?: unknown };
+
+function errorTextOf(body: unknown): string {
+  if (!body || typeof body !== "object") return "";
+  const b = body as BlockedErrorBody;
+  const msg = b.error?.message ?? b.message;
+  return typeof msg === "string" ? msg : "";
+}
+
+/** Provider content-moderation refusal (not instability): 451 or block/safety wording. */
+function isBlockedError(status: number, body: unknown, raw: string): boolean {
+  if (status === 451) return true;
+  const hay = `${errorTextOf(body)} ${raw.slice(0, 500)}`.toLowerCase();
+  return (
+    hay.includes("blocked") ||
+    hay.includes("content filter") ||
+    hay.includes("moderation") ||
+    hay.includes("safety")
+  );
+}
+
 /** Join text from a stream:true SSE response (chat/completions and responses shapes). */
 export function extractStreamText(sseText: string): string {
   const out: string[] = [];
@@ -370,16 +391,19 @@ async function askOpencode(
   const raw = await r.text();
 
   if (!r.ok) {
+    const blocked = isBlockedError(r.status, null, raw);
     commandLogger.error(
       {
         type: "ai_event",
         action: "ask_api_error",
         upstream: "opencode",
         status: r.status,
+        blocked,
         raw: raw.slice(0, 1000),
       },
       "opencode api error",
     );
+    if (blocked) throw new Error("IA recusou esse conteúdo. Tente reformular a pergunta.");
     throw new Error("IA indisponível no momento. Tente novamente.");
   }
 
@@ -452,16 +476,19 @@ export async function askBansos(
   };
 
   if (!r.ok) {
+    const blocked = isBlockedError(r.status, j, raw);
     commandLogger.error(
       {
         type: "ai_event",
         action: "ask_api_error",
         status: r.status,
+        blocked,
         body: j,
         raw: raw.slice(0, 1000),
       },
       "kilo api error",
     );
+    if (blocked) throw new Error("IA recusou esse conteúdo. Tente reformular a pergunta.");
     throw new Error("IA indisponível no momento. Tente novamente.");
   }
 
@@ -560,16 +587,20 @@ export async function visionBansos(
     const raw = await r.text();
     const elapsed = Date.now() - start;
     if (!r.ok) {
+      const blocked = isBlockedError(r.status, null, raw);
       commandLogger.error(
         {
           type: "ai_event",
           action: "vision_api_error",
           upstream: "opencode",
           status: r.status,
+          blocked,
           raw: raw.slice(0, 1000),
         },
         "opencode vision api error",
       );
+      if (blocked)
+        throw new Error("Visão recusou esse conteúdo. Tente com outra imagem ou prompt.");
       throw new Error("Visão indisponível no momento. Tente novamente.");
     }
     const text = extractStreamText(raw).trim();
@@ -631,16 +662,19 @@ export async function visionBansos(
     error?: { message?: string };
   };
   if (!r.ok) {
+    const blocked = isBlockedError(r.status, j, raw);
     commandLogger.error(
       {
         type: "ai_event",
         action: "vision_api_error",
         status: r.status,
+        blocked,
         body: j,
         raw: raw.slice(0, 1000),
       },
       "vision api error",
     );
+    if (blocked) throw new Error("Visão recusou esse conteúdo. Tente com outra imagem ou prompt.");
     throw new Error("Visão indisponível no momento. Tente novamente.");
   }
   const text = j.choices?.[0]?.message?.content ?? "";
