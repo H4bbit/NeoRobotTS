@@ -175,7 +175,7 @@ type SseOutputItem = { content?: Array<{ text?: unknown }> };
 type SsePayload = {
   choices?: SseChoice[];
   output_text?: unknown;
-  delta?: { text?: unknown };
+  delta?: unknown;
   output?: SseOutputItem[];
 };
 
@@ -196,7 +196,8 @@ export function extractStreamText(sseText: string): string {
       out.push(sseTextOf(j.choices?.[0]?.delta?.content));
       out.push(sseTextOf(j.choices?.[0]?.message?.content));
       out.push(sseTextOf(j.output_text));
-      out.push(sseTextOf(j.delta?.text));
+      // responses API streams output_text deltas as a bare string in `delta`
+      out.push(sseTextOf(j.delta));
       for (const item of j.output ?? []) {
         for (const c of item.content ?? []) out.push(sseTextOf(c.text));
       }
@@ -324,11 +325,97 @@ export function getVisionTokens(): number {
   }
 }
 
+function isOpencodeModel(model: string): boolean {
+  return (
+    OPENCODE_RESPONSES_MODELS.has(model) ||
+    BANSOS_ALIVE_18.some((m) => m.id === model && !m.id.includes("/") && !m.id.includes(":"))
+  );
+}
+
+function isResponsesModel(model: string): boolean {
+  return OPENCODE_RESPONSES_MODELS.has(model) || model.includes("muse-spark");
+}
+
+type OpencodeSseUsage = { usage?: unknown };
+
+async function askOpencode(
+  model: string,
+  prompt: string,
+  maxTokens: number,
+): Promise<{ text: string; usage?: unknown }> {
+  const responsesApi = isResponsesModel(model);
+  const rawBody: Record<string, unknown> = responsesApi
+    ? {
+        model,
+        input: [{ role: "user", content: [{ type: "input_text", text: prompt }] }],
+        max_output_tokens: maxTokens,
+        stream: true,
+      }
+    : {
+        model,
+        messages: [{ role: "user", content: prompt }],
+        max_tokens: maxTokens,
+        temperature: 0.2,
+        stream: true,
+      };
+  const body = JSON.stringify(transformOpencodeBody(rawBody));
+  const url = responsesApi ? `${API_OPENCODE}/responses` : `${API_OPENCODE}/chat/completions`;
+
+  const r = await fetch(url, {
+    method: "POST",
+    headers: opencodeHeaders(),
+    body,
+    signal: AbortSignal.timeout(90_000),
+  });
+  const raw = await r.text();
+
+  if (!r.ok) {
+    commandLogger.error(
+      {
+        type: "ai_event",
+        action: "ask_api_error",
+        upstream: "opencode",
+        status: r.status,
+        raw: raw.slice(0, 1000),
+      },
+      "opencode api error",
+    );
+    throw new Error("IA indisponível no momento. Tente novamente.");
+  }
+
+  const content = extractStreamText(raw).trim();
+  if (!content) {
+    commandLogger.error(
+      { type: "ai_event", action: "ask_empty_content", upstream: "opencode", model },
+      "opencode empty content",
+    );
+    throw new Error("IA não retornou conteúdo. Tente reformular a pergunta.");
+  }
+  let usage: unknown;
+  try {
+    usage = (JSON.parse(raw) as OpencodeSseUsage).usage;
+  } catch {
+    usage = undefined;
+  }
+  return { text: content, usage };
+}
+
 export async function askBansos(
   prompt: string,
   maxTokens = getAskTokens(),
 ): Promise<{ text: string; model: string; usage?: unknown }> {
   const model = getCurrentAskModel();
+  if (isOpencodeModel(model)) {
+    const start = Date.now();
+    const { text, usage } = await askOpencode(model, prompt, maxTokens);
+    const elapsed = Date.now() - start;
+    commandLogger.info(
+      { type: "ai_event", upstream: "opencode", model, elapsed, usage },
+      "ask succeeded",
+    );
+    return { text, model, usage };
+  }
+
   const body = JSON.stringify({
     model,
     messages: [{ role: "user", content: prompt }],
@@ -430,6 +517,76 @@ export async function visionBansos(
   const model = getCurrentVisionModel();
   const maxTokens = getVisionTokens();
   const dataUrl = `data:${mime};base64,${imageB64}`;
+  if (isOpencodeModel(model)) {
+    const start = Date.now();
+    const responsesApi = isResponsesModel(model);
+    const rawBody: Record<string, unknown> = responsesApi
+      ? {
+          model,
+          input: [
+            {
+              role: "user",
+              content: [
+                { type: "input_text", text: prompt },
+                { type: "input_image", image_url: dataUrl },
+              ],
+            },
+          ],
+          max_output_tokens: maxTokens,
+          stream: true,
+        }
+      : {
+          model,
+          messages: [
+            {
+              role: "user",
+              content: [
+                { type: "text", text: prompt },
+                { type: "image_url", image_url: { url: dataUrl } },
+              ],
+            },
+          ],
+          max_tokens: maxTokens,
+          stream: true,
+        };
+    const body = JSON.stringify(transformOpencodeBody(rawBody));
+    const url = responsesApi ? `${API_OPENCODE}/responses` : `${API_OPENCODE}/chat/completions`;
+    const r = await fetch(url, {
+      method: "POST",
+      headers: opencodeHeaders(),
+      body,
+      signal: AbortSignal.timeout(120_000),
+    });
+    const raw = await r.text();
+    const elapsed = Date.now() - start;
+    if (!r.ok) {
+      commandLogger.error(
+        {
+          type: "ai_event",
+          action: "vision_api_error",
+          upstream: "opencode",
+          status: r.status,
+          raw: raw.slice(0, 1000),
+        },
+        "opencode vision api error",
+      );
+      throw new Error("Visão indisponível no momento. Tente novamente.");
+    }
+    const text = extractStreamText(raw).trim();
+    if (!text) {
+      commandLogger.error(
+        { type: "ai_event", action: "vision_empty_content", upstream: "opencode", model },
+        "opencode vision empty content",
+      );
+      throw new Error("Visão não retornou conteúdo. Tente novamente com outra imagem ou prompt.");
+    }
+    commandLogger.info(
+      { type: "ai_event", upstream: "opencode", model, elapsed, status: r.status },
+      "vision succeeded",
+    );
+    return { text, model };
+  }
+
   const body = JSON.stringify({
     model,
     messages: [
