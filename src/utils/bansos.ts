@@ -263,7 +263,7 @@ export type BansosModel = {
   reasoning: boolean;
   note: string;
 };
-export const BANSOS_ALIVE_18: BansosModel[] = [
+export const BANSOS_MODELS: BansosModel[] = [
   {
     id: "muse-spark-1.3-contributor-free",
     vision: true,
@@ -273,6 +273,8 @@ export const BANSOS_ALIVE_18: BansosModel[] = [
   { id: "muse-spark-1.2-contributor-free", vision: true, reasoning: true, note: "1M ctx" },
   { id: "mimo-v2.5-free", vision: true, reasoning: true, note: "200K" },
   { id: "ling-3.0-flash-fin-free", vision: false, reasoning: true, note: "262K" },
+  { id: "nemotron-3-ultra-free", vision: false, reasoning: true, note: "1M" },
+  { id: "nemotron-3.5-lightning-free", vision: false, reasoning: true, note: "262K lento" },
   { id: "big-pickle", vision: false, reasoning: true, note: "200K" },
   { id: "kilo-auto/free", vision: false, reasoning: false, note: "256K rápido s/ reasoning" },
   { id: "stepfun/step-3.7-flash:free", vision: true, reasoning: true, note: "vision 262K" },
@@ -296,6 +298,8 @@ export const BANSOS_ALIVE_18: BansosModel[] = [
   { id: "nvidia/nemotron-3.5-lightning:free", vision: false, reasoning: true, note: "1M" },
   { id: "nvidia/nemotron-3.5-content-safety:free", vision: true, reasoning: true, note: "128K" },
   { id: "inclusionai/ling-3.0-flash-sante:free", vision: false, reasoning: true, note: "262K" },
+  { id: "liquid/lfm-2.5-2.6b:free", vision: false, reasoning: true, note: "65K rápido" },
+  { id: "poolside/laguna-s-2.1:free", vision: false, reasoning: true, note: "262K" },
   { id: "inclusionai/ling-3.0-flash-fin:free", vision: false, reasoning: true, note: "262K" },
 ];
 
@@ -349,7 +353,7 @@ export function getVisionTokens(): number {
 function isOpencodeModel(model: string): boolean {
   return (
     OPENCODE_RESPONSES_MODELS.has(model) ||
-    BANSOS_ALIVE_18.some((m) => m.id === model && !m.id.includes("/") && !m.id.includes(":"))
+    BANSOS_MODELS.some((m) => m.id === model && !m.id.includes("/") && !m.id.includes(":"))
   );
 }
 

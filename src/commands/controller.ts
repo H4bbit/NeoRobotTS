@@ -28,7 +28,7 @@ import { isGroupActive, setGroupActive } from "./db.js";
 import { reply, requireBotAdmin, requireGroup, requireSenderAdmin } from "./helpers.js";
 import {
   askBansos,
-  BANSOS_ALIVE_18,
+  BANSOS_MODELS,
   checkRateLimit,
   getAskModel,
   ASK_MODEL,
@@ -468,7 +468,7 @@ export async function commandController(
       if (!(await requireOwner(sock, msg, jid))) break;
       const curAsk = getAskModel();
       const curVision = getVisionModel();
-      const lines = BANSOS_ALIVE_18.map((m, i) => {
+      const lines = BANSOS_MODELS.map((m, i) => {
         const cur = m.id === curAsk ? " ★ ask" : m.id === curVision ? " ★ vision" : "";
         const v = m.vision ? "👁️" : "  ";
         const r = m.reasoning ? "🧠" : "  ";
@@ -544,7 +544,7 @@ export async function commandController(
         await sock.sendMessage(
           jid,
           {
-            text: `🤖 *Modelos atuais*\n• ask: \`${curAsk}\`\n• vision: \`${curVision}\`\n\nUse: !ialist pra ver os 18\n!iamodel <id> → ask\n!iamodel vision <id> → vision\n!iamodel reset`,
+            text: `🤖 *Modelos atuais*\n• ask: \`${curAsk}\`\n• vision: \`${curVision}\`\n\nUse: !ialist pra ver a lista\n!iamodel <id> → ask\n!iamodel vision <id> → vision\n!iamodel reset`,
           },
           { quoted: msg },
         );
@@ -579,7 +579,7 @@ export async function commandController(
       } else {
         targetId = args[0]!.trim();
       }
-      const found = BANSOS_ALIVE_18.find((m) => m.id === targetId);
+      const found = BANSOS_MODELS.find((m) => m.id === targetId);
       if (!found) {
         await reply(
           sock,
