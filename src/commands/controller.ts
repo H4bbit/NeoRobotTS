@@ -24,7 +24,7 @@ import {
   webpToImage,
 } from "../utils/sticker.js";
 import { animatedWebpToVideoViaPillow } from "../utils/tovideoPillow.js";
-import { isGroupActive, setGroupActive } from "./db.js";
+import { deleteAiConfig, isAiPvEnabled, isGroupActive, setAiConfig, setGroupActive } from "./db.js";
 import { reply, requireBotAdmin, requireGroup, requireSenderAdmin } from "./helpers.js";
 import {
   askBansos,
@@ -44,7 +44,6 @@ import {
 import { requireOwner } from "../utils/owner.js";
 import { downloadMedia, extractViewOnce, sendRevealedMedia } from "../utils/media.js";
 import { downloadContentFromMessage, type proto } from "baileys";
-import { deleteAiConfig, getAiConfig, setAiConfig } from "./db.js";
 
 export async function commandController(
   sock: WASocket,
@@ -424,6 +423,10 @@ export async function commandController(
       break;
     }
     case "ask": {
+      if (jidType !== "group" && !isAiPvEnabled()) {
+        await reply(sock, jid, msg, "🤖", "🤖 IA desativada no privado.");
+        break;
+      }
       const prompt = parts.slice(1).join(" ").trim();
       if (!prompt) {
         await reply(
@@ -609,7 +612,36 @@ export async function commandController(
       }
       break;
     }
+    case "aipv": {
+      if (!(await requireOwner(sock, msg, jid))) break;
+      const arg = parts[1]?.toLowerCase();
+      if (!arg) {
+        const on = isAiPvEnabled();
+        await sock.sendMessage(
+          jid,
+          {
+            text: `🤖 *IA no privado: ${on ? "✅ ligada" : "❌ desligada"}*\n\nUse: !aipv on → libera !ask/!vision no PV\n!aipv off → bloqueia !ask/!vision no PV (grupos continuam normais)`,
+          },
+          { quoted: msg },
+        );
+        break;
+      }
+      if (arg === "on") {
+        deleteAiConfig("ai_pv");
+        await reply(sock, jid, msg, "✅", "✅ IA liberada no privado.");
+      } else if (arg === "off") {
+        setAiConfig("ai_pv", "off");
+        await reply(sock, jid, msg, "✅", "✅ IA bloqueada no privado. Grupos continuam normais.");
+      } else {
+        await reply(sock, jid, msg, "❓", "Uso: !aipv on|off");
+      }
+      break;
+    }
     case "vision": {
+      if (jidType !== "group" && !isAiPvEnabled()) {
+        await reply(sock, jid, msg, "🤖", "🤖 IA desativada no privado.");
+        break;
+      }
       // prompt obedecendo o comando: "!vision transcreva" ou "!vision descreva a roupa" ou só "!vision" (usa default)
       const prompt = parts.slice(1).join(" ").trim() || VISION_PROMPT_DEFAULT;
       // pega imagem: direta no msg atual ou quoted (reply)
