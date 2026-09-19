@@ -97,3 +97,11 @@ export function deleteAiConfig(key: string): void {
   db.prepare("DELETE FROM ai_config WHERE key = ?").run(key);
   logger.info({ type: "db_event", action: "DELETE_AI_CONFIG", key }, "ai config delete");
 }
+
+export function isAiPvEnabled(): boolean {
+  try {
+    return getAiConfig("ai_pv") !== "off";
+  } catch {
+    return true;
+  }
+}
