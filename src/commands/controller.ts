@@ -157,13 +157,28 @@ export async function commandController(
       }
       try {
         const input = await downloadStickerMedia(media);
-        commandLogger.info({ type: "command_event", command: "tovideo2", jid, stage: "downloaded", inputSize: input.length }, "tovideo2 downloaded");
+        commandLogger.info(
+          {
+            type: "command_event",
+            command: "tovideo2",
+            jid,
+            stage: "downloaded",
+            inputSize: input.length,
+          },
+          "tovideo2 downloaded",
+        );
         const video = await animatedWebpToVideoViaPillow(input);
         await sock.sendMessage(jid, { video, mimetype: "video/mp4" }, { quoted: msg });
         await sendReaction(sock, msg, "✅");
-        commandLogger.info({ type: "command_event", command: "tovideo2", jid, outputSize: video.length }, "tovideo2 succeeded");
+        commandLogger.info(
+          { type: "command_event", command: "tovideo2", jid, outputSize: video.length },
+          "tovideo2 succeeded",
+        );
       } catch (error) {
-        const text = error instanceof StickerConversionError ? error.message : "Não foi possível converter o sticker em vídeo (tovideo2).";
+        const text =
+          error instanceof StickerConversionError
+            ? error.message
+            : "Não foi possível converter o sticker em vídeo (tovideo2).";
         await sendReaction(sock, msg, "⚠️");
         await sock.sendMessage(jid, { text }, { quoted: msg });
       }
@@ -411,12 +426,24 @@ export async function commandController(
     case "ask": {
       const prompt = parts.slice(1).join(" ").trim();
       if (!prompt) {
-        await reply(sock, jid, msg, "❓", "Uso: !ask <pergunta>\nEx: !ask qual a capital do Brasil?");
+        await reply(
+          sock,
+          jid,
+          msg,
+          "❓",
+          "Uso: !ask <pergunta>\nEx: !ask qual a capital do Brasil?",
+        );
         break;
       }
       const rl = checkRateLimit(jid);
       if (!rl.ok) {
-        await reply(sock, jid, msg, "⏳", `⏳ Limite 200/h atingido. Tente em ${Math.ceil(rl.resetMs / 60000)} min.`);
+        await reply(
+          sock,
+          jid,
+          msg,
+          "⏳",
+          `⏳ Limite 200/h atingido. Tente em ${Math.ceil(rl.resetMs / 60000)} min.`,
+        );
         break;
       }
       await sendReaction(sock, msg, "🤔");
@@ -426,7 +453,10 @@ export async function commandController(
         await sendReaction(sock, msg, "✅");
       } catch (error) {
         const rawErr = error instanceof Error ? error.message : String(error);
-        commandLogger.error({ type: "ai_event", action: "ask_failed", jid, error: rawErr }, "ask failed");
+        commandLogger.error(
+          { type: "ai_event", action: "ask_failed", jid, error: rawErr },
+          "ask failed",
+        );
         // mensagens de bansos.ts já são seguras (sem raw/reasoning). "Resposta truncada" agora é neutra, sem culpar user.
         const isKnown = rawErr.startsWith("IA ") || rawErr.startsWith("Resposta ");
         const userMsg = isKnown ? rawErr : "Não consegui gerar resposta. Tente novamente.";
@@ -457,7 +487,9 @@ export async function commandController(
       if (args.length === 0) {
         await sock.sendMessage(
           jid,
-          { text: `🤖 *Tokens atuais*\n• ask: \`${curAsk}\`\n• vision: \`${curVision}\`\n\nUse: !aitokens <n> → ask\n!aitokens vision <n> → vision\n!aitokens reset` },
+          {
+            text: `🤖 *Tokens atuais*\n• ask: \`${curAsk}\`\n• vision: \`${curVision}\`\n\nUse: !aitokens <n> → ask\n!aitokens vision <n> → vision\n!aitokens reset`,
+          },
           { quoted: msg },
         );
         break;
@@ -465,7 +497,11 @@ export async function commandController(
       if (args[0] === "reset") {
         deleteAiConfig("ask_tokens");
         deleteAiConfig("vision_tokens");
-        await sock.sendMessage(jid, { text: `✅ Resetado\n• ask: \`${ASK_MAX_TOKENS}\`\n• vision: \`${VISION_MAX_TOKENS}\`` }, { quoted: msg });
+        await sock.sendMessage(
+          jid,
+          { text: `✅ Resetado\n• ask: \`${ASK_MAX_TOKENS}\`\n• vision: \`${VISION_MAX_TOKENS}\`` },
+          { quoted: msg },
+        );
         await sendReaction(sock, msg, "✅");
         break;
       }
@@ -473,7 +509,11 @@ export async function commandController(
       if (args[0] === "vision") {
         const v = args[1]?.trim();
         if (!v) {
-          await sock.sendMessage(jid, { text: "Uso: !aitokens vision <n>\nEx: !aitokens vision 3000" }, { quoted: msg });
+          await sock.sendMessage(
+            jid,
+            { text: "Uso: !aitokens vision <n>\nEx: !aitokens vision 3000" },
+            { quoted: msg },
+          );
           break;
         }
         target = Number.parseInt(v, 10);
@@ -503,7 +543,9 @@ export async function commandController(
       if (args.length === 0) {
         await sock.sendMessage(
           jid,
-          { text: `🤖 *Modelos atuais*\n• ask: \`${curAsk}\`\n• vision: \`${curVision}\`\n\nUse: !ialist pra ver os 18\n!iamodel <id> → ask\n!iamodel vision <id> → vision\n!iamodel reset` },
+          {
+            text: `🤖 *Modelos atuais*\n• ask: \`${curAsk}\`\n• vision: \`${curVision}\`\n\nUse: !ialist pra ver os 18\n!iamodel <id> → ask\n!iamodel vision <id> → vision\n!iamodel reset`,
+          },
           { quoted: msg },
         );
         break;
@@ -511,7 +553,11 @@ export async function commandController(
       if (args[0] === "reset") {
         deleteAiConfig("ask_model");
         deleteAiConfig("vision_model");
-        await sock.sendMessage(jid, { text: `✅ Resetado\n• ask: \`${ASK_MODEL}\`\n• vision: \`${VISION_MODEL}\`` }, { quoted: msg });
+        await sock.sendMessage(
+          jid,
+          { text: `✅ Resetado\n• ask: \`${ASK_MODEL}\`\n• vision: \`${VISION_MODEL}\`` },
+          { quoted: msg },
+        );
         await sendReaction(sock, msg, "✅");
         break;
       }
@@ -521,7 +567,13 @@ export async function commandController(
         isVision = true;
         targetId = args[1]?.trim() ?? "";
         if (!targetId) {
-          await sock.sendMessage(jid, { text: "Uso: !iamodel vision <id>\nEx: !iamodel vision muse-spark-1.2-contributor-free" }, { quoted: msg });
+          await sock.sendMessage(
+            jid,
+            {
+              text: "Uso: !iamodel vision <id>\nEx: !iamodel vision muse-spark-1.2-contributor-free",
+            },
+            { quoted: msg },
+          );
           break;
         }
       } else {
@@ -529,11 +581,23 @@ export async function commandController(
       }
       const found = BANSOS_ALIVE_18.find((m) => m.id === targetId);
       if (!found) {
-        await reply(sock, jid, msg, "❌", `❌ \`${targetId}\` não está entre os modelos disponíveis. Use !ialist`);
+        await reply(
+          sock,
+          jid,
+          msg,
+          "❌",
+          `❌ \`${targetId}\` não está entre os modelos disponíveis. Use !ialist`,
+        );
         break;
       }
       if (isVision && !found.vision) {
-        await reply(sock, jid, msg, "❌", `❌ \`${targetId}\` não suporta imagem (sem 👁️). Escolha um com 👁️ no !ialist`);
+        await reply(
+          sock,
+          jid,
+          msg,
+          "❌",
+          `❌ \`${targetId}\` não suporta imagem (sem 👁️). Escolha um com 👁️ no !ialist`,
+        );
         break;
       }
       if (isVision) {
@@ -550,15 +614,28 @@ export async function commandController(
       const prompt = parts.slice(1).join(" ").trim() || VISION_PROMPT_DEFAULT;
       // pega imagem: direta no msg atual ou quoted (reply)
       const directImg = (msg.message?.imageMessage ?? null) as proto.Message.IImageMessage | null;
-      const quotedImg = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage?.imageMessage ?? null;
+      const quotedImg =
+        msg.message?.extendedTextMessage?.contextInfo?.quotedMessage?.imageMessage ?? null;
       const imageMessage = directImg ?? quotedImg;
       if (!imageMessage) {
-        await reply(sock, jid, msg, "❓", "Uso: !vision [prompt]\nEnvie uma imagem com legenda !vision <prompt> ou responda uma imagem com !vision <prompt>\nEx: !vision transcreva o texto da imagem");
+        await reply(
+          sock,
+          jid,
+          msg,
+          "❓",
+          "Uso: !vision [prompt]\nEnvie uma imagem com legenda !vision <prompt> ou responda uma imagem com !vision <prompt>\nEx: !vision transcreva o texto da imagem",
+        );
         break;
       }
       const rl = checkRateLimit(jid);
       if (!rl.ok) {
-        await reply(sock, jid, msg, "⏳", `⏳ Limite 200/h atingido. Tente em ${Math.ceil(rl.resetMs / 60000)} min.`);
+        await reply(
+          sock,
+          jid,
+          msg,
+          "⏳",
+          `⏳ Limite 200/h atingido. Tente em ${Math.ceil(rl.resetMs / 60000)} min.`,
+        );
         break;
       }
       await sendReaction(sock, msg, "👁️");
@@ -569,14 +646,30 @@ export async function commandController(
         const buf = Buffer.concat(chunks);
         const mime = (imageMessage.mimetype ?? "image/jpeg") as string;
         const b64 = buf.toString("base64");
-        commandLogger.info({ type: "ai_event", action: "vision_start", jid, prompt: prompt.slice(0, 120), imageSize: buf.length, mime }, "vision start");
+        commandLogger.info(
+          {
+            type: "ai_event",
+            action: "vision_start",
+            jid,
+            prompt: prompt.slice(0, 120),
+            imageSize: buf.length,
+            mime,
+          },
+          "vision start",
+        );
         const { text: answer } = await visionBansos(b64, mime, prompt);
         await sock.sendMessage(jid, { text: answer }, { quoted: msg });
         await sendReaction(sock, msg, "✅");
       } catch (error) {
         const rawErr = error instanceof Error ? error.message : String(error);
-        commandLogger.error({ type: "ai_event", action: "vision_failed", jid, error: rawErr }, "vision failed");
-        const userMsg = rawErr.startsWith("Visão ") || rawErr.startsWith("IA ") ? rawErr : "Não consegui analisar a imagem. Tente novamente.";
+        commandLogger.error(
+          { type: "ai_event", action: "vision_failed", jid, error: rawErr },
+          "vision failed",
+        );
+        const userMsg =
+          rawErr.startsWith("Visão ") || rawErr.startsWith("IA ")
+            ? rawErr
+            : "Não consegui analisar a imagem. Tente novamente.";
         await reply(sock, jid, msg, "⚠️", `⚠️ ${userMsg}`);
       }
       break;
@@ -603,7 +696,13 @@ export async function commandController(
         break;
       }
       if (!targetJid) {
-        await reply(sock, jid, msg, "❓", "Marque ou responda alguém para banir. Ex: !ban @usuario");
+        await reply(
+          sock,
+          jid,
+          msg,
+          "❓",
+          "Marque ou responda alguém para banir. Ex: !ban @usuario",
+        );
         commandLogger.info(
           { type: "admin_event", action: "ban_no_target", jid, senderJid },
           "ban no target",
@@ -662,7 +761,12 @@ export async function commandController(
         await sendReaction(sock, msg, "✅");
       } catch (error) {
         commandLogger.error(
-          { type: "media_event", action: "reveal_failed", jid, error: error instanceof Error ? error.message : String(error) },
+          {
+            type: "media_event",
+            action: "reveal_failed",
+            jid,
+            error: error instanceof Error ? error.message : String(error),
+          },
           "reveal failed",
         );
         await reply(sock, jid, msg, "⚠️", "⚠️ Erro ao revelar a mídia.");

@@ -46,7 +46,12 @@ export type BansosModel = {
   note: string;
 };
 export const BANSOS_ALIVE_18: BansosModel[] = [
-  { id: "muse-spark-1.3-contributor-free", vision: true, reasoning: true, note: "responses 1M ctx" },
+  {
+    id: "muse-spark-1.3-contributor-free",
+    vision: true,
+    reasoning: true,
+    note: "responses 1M ctx",
+  },
   { id: "muse-spark-1.2-contributor-free", vision: true, reasoning: true, note: "1M ctx" },
   { id: "mimo-v2.5-free", vision: true, reasoning: true, note: "200K" },
   { id: "ling-3.0-flash-fin-free", vision: false, reasoning: true, note: "262K" },
@@ -55,10 +60,20 @@ export const BANSOS_ALIVE_18: BansosModel[] = [
   { id: "stepfun/step-3.7-flash:free", vision: true, reasoning: true, note: "vision 262K" },
   { id: "nvidia/nemotron-3-ultra-550b-a55b:free", vision: false, reasoning: true, note: "1M" },
   { id: "nvidia/nemotron-3-super-120b-a12b:free", vision: false, reasoning: true, note: "262K" },
-  { id: "dots-studio/dots-3-note-preview:free", vision: true, reasoning: true, note: "512K mas vision 400" },
+  {
+    id: "dots-studio/dots-3-note-preview:free",
+    vision: true,
+    reasoning: true,
+    note: "512K mas vision 400",
+  },
   { id: "cohere/north-mini-code:free", vision: false, reasoning: false, note: "code 256K" },
   { id: "poolside/laguna-xs-2.1:free", vision: false, reasoning: true, note: "262K" },
-  { id: "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free", vision: true, reasoning: true, note: "256K" },
+  {
+    id: "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+    vision: true,
+    reasoning: true,
+    note: "256K",
+  },
   { id: "openrouter/free", vision: true, reasoning: false, note: "200K" },
   { id: "nvidia/nemotron-3.5-lightning:free", vision: false, reasoning: true, note: "1M" },
   { id: "nvidia/nemotron-3.5-content-safety:free", vision: true, reasoning: true, note: "128K" },
@@ -80,8 +95,12 @@ function getCurrentVisionModel(): string {
     return VISION_MODEL;
   }
 }
-export function getAskModel(): string { return getCurrentAskModel(); }
-export function getVisionModel(): string { return getCurrentVisionModel(); }
+export function getAskModel(): string {
+  return getCurrentAskModel();
+}
+export function getVisionModel(): string {
+  return getCurrentVisionModel();
+}
 
 export const ASK_TOKENS_MIN = 10;
 export const ASK_TOKENS_MAX = 4000;
@@ -109,7 +128,10 @@ export function getVisionTokens(): number {
   }
 }
 
-export async function askBansos(prompt: string, maxTokens = getAskTokens()): Promise<{ text: string; model: string; usage?: unknown }> {
+export async function askBansos(
+  prompt: string,
+  maxTokens = getAskTokens(),
+): Promise<{ text: string; model: string; usage?: unknown }> {
   const model = getCurrentAskModel();
   const body = JSON.stringify({
     model,
@@ -133,7 +155,10 @@ export async function askBansos(prompt: string, maxTokens = getAskTokens()): Pro
   try {
     json = JSON.parse(raw);
   } catch {
-    commandLogger.error({ type: "ai_event", action: "ask_invalid_json", status: r.status, raw: raw.slice(0, 1000) }, "kilo invalid json");
+    commandLogger.error(
+      { type: "ai_event", action: "ask_invalid_json", status: r.status, raw: raw.slice(0, 1000) },
+      "kilo invalid json",
+    );
     throw new Error("IA resposta inválida. Tente novamente.");
   }
 
@@ -144,7 +169,16 @@ export async function askBansos(prompt: string, maxTokens = getAskTokens()): Pro
   };
 
   if (!r.ok) {
-    commandLogger.error({ type: "ai_event", action: "ask_api_error", status: r.status, body: j, raw: raw.slice(0, 1000) }, "kilo api error");
+    commandLogger.error(
+      {
+        type: "ai_event",
+        action: "ask_api_error",
+        status: r.status,
+        body: j,
+        raw: raw.slice(0, 1000),
+      },
+      "kilo api error",
+    );
     throw new Error("IA indisponível no momento. Tente novamente.");
   }
 
@@ -152,12 +186,18 @@ export async function askBansos(prompt: string, maxTokens = getAskTokens()): Pro
   const content = rawContent.trim();
   const finish = j.choices?.[0]?.finish_reason;
   if (!content) {
-    commandLogger.error({ type: "ai_event", action: "ask_empty_content", model, finish, raw: raw.slice(0, 2000) }, "kilo empty content");
+    commandLogger.error(
+      { type: "ai_event", action: "ask_empty_content", model, finish, raw: raw.slice(0, 2000) },
+      "kilo empty content",
+    );
     if (finish === "length") {
       // reasoning consumiu o limite e não sobrou pra content — retry automático com mais tokens (não culpa o user)
       if (maxTokens < ASK_TOKENS_MAX) {
         const retryTokens = Math.min(ASK_TOKENS_MAX, maxTokens + 1000);
-        commandLogger.warn({ type: "ai_event", action: "ask_retry_length", model, from: maxTokens, to: retryTokens }, "retry ask on length");
+        commandLogger.warn(
+          { type: "ai_event", action: "ask_retry_length", model, from: maxTokens, to: retryTokens },
+          "retry ask on length",
+        );
         return askBansos(prompt, retryTokens);
       }
       throw new Error("Resposta truncada por limite de tokens.");
@@ -166,7 +206,10 @@ export async function askBansos(prompt: string, maxTokens = getAskTokens()): Pro
   }
   // se veio truncado mas tem conteúdo, entrega o que tem (não é erro) — só loga
   if (finish === "length" && content) {
-    commandLogger.warn({ type: "ai_event", action: "ask_truncated", model, finish, contentLen: content.length }, "ask truncated but delivering");
+    commandLogger.warn(
+      { type: "ai_event", action: "ask_truncated", model, finish, contentLen: content.length },
+      "ask truncated but delivering",
+    );
   }
 
   commandLogger.info(
@@ -218,7 +261,15 @@ export async function visionBansos(
   try {
     json = JSON.parse(raw);
   } catch {
-    commandLogger.error({ type: "ai_event", action: "vision_invalid_json", status: r.status, raw: raw.slice(0, 1000) }, "vision invalid json");
+    commandLogger.error(
+      {
+        type: "ai_event",
+        action: "vision_invalid_json",
+        status: r.status,
+        raw: raw.slice(0, 1000),
+      },
+      "vision invalid json",
+    );
     throw new Error("Visão resposta inválida. Tente novamente.");
   }
   const j = json as {
@@ -227,12 +278,30 @@ export async function visionBansos(
     error?: { message?: string };
   };
   if (!r.ok) {
-    commandLogger.error({ type: "ai_event", action: "vision_api_error", status: r.status, body: j, raw: raw.slice(0, 1000) }, "vision api error");
+    commandLogger.error(
+      {
+        type: "ai_event",
+        action: "vision_api_error",
+        status: r.status,
+        body: j,
+        raw: raw.slice(0, 1000),
+      },
+      "vision api error",
+    );
     throw new Error("Visão indisponível no momento. Tente novamente.");
   }
   const text = j.choices?.[0]?.message?.content ?? "";
   if (!text) {
-    commandLogger.error({ type: "ai_event", action: "vision_empty_content", model, status: r.status, raw: raw.slice(0, 2000) }, "vision empty content");
+    commandLogger.error(
+      {
+        type: "ai_event",
+        action: "vision_empty_content",
+        model,
+        status: r.status,
+        raw: raw.slice(0, 2000),
+      },
+      "vision empty content",
+    );
     throw new Error("Visão não retornou conteúdo. Tente novamente com outra imagem ou prompt.");
   }
   commandLogger.info(

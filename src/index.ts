@@ -81,7 +81,10 @@ const startSock = async () => {
       if (connection === "close") {
         const statusCode = (lastDisconnect?.error as Boom)?.output?.statusCode;
         const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
-        console.log(`🔌 Conexão fechada (${statusCode ?? "sem código"}):`, lastDisconnect?.error?.message ?? lastDisconnect?.error);
+        console.log(
+          `🔌 Conexão fechada (${statusCode ?? "sem código"}):`,
+          lastDisconnect?.error?.message ?? lastDisconnect?.error,
+        );
         if (shouldReconnect) {
           console.log("🔄 Reconectando em 3s...");
           await sleep(3000);

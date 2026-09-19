@@ -15,10 +15,7 @@ export interface DownloadedMedia {
  * Elimina o padrão repetido de Buffer.from([]) + for-await + concat.
  */
 export async function downloadMedia(
-  message:
-    | proto.Message.IImageMessage
-    | proto.Message.IVideoMessage
-    | proto.Message.IAudioMessage,
+  message: proto.Message.IImageMessage | proto.Message.IVideoMessage | proto.Message.IAudioMessage,
   mediaType: MediaType,
 ): Promise<DownloadedMedia> {
   const stream = await downloadContentFromMessage(message, mediaType);
@@ -32,9 +29,7 @@ export async function downloadMedia(
  * Extrai a mensagem interna de uma view-once message,
  * cobrindo todas as variantes da API da Baileys.
  */
-export function extractViewOnce(
-  quoted: proto.IMessage,
-): {
+export function extractViewOnce(quoted: proto.IMessage): {
   image?: proto.Message.IImageMessage | null;
   video?: proto.Message.IVideoMessage | null;
   audio?: proto.Message.IAudioMessage | null;
@@ -61,10 +56,7 @@ export async function sendRevealedMedia(
   jid: string,
   msg: import("baileys").proto.IWebMessageInfo,
   mediaType: MediaType,
-  message:
-    | proto.Message.IImageMessage
-    | proto.Message.IVideoMessage
-    | proto.Message.IAudioMessage,
+  message: proto.Message.IImageMessage | proto.Message.IVideoMessage | proto.Message.IAudioMessage,
   caption?: string,
 ): Promise<void> {
   const { buffer, size } = await downloadMedia(message, mediaType);
