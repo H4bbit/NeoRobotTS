@@ -8,13 +8,14 @@ export const API_OPENCODE = `${UPSTREAM}/v1`;
 export const KILO_CHAT_URL = "https://api.kilo.ai/api/gateway/chat/completions";
 
 export function kiloHeaders(): Record<string, string> {
+  // Kilo gateway free é keyless (pi-bansos@0.4.13): sem Authorization —
+  // o gateway rejeita placeholder tipo "Bearer kilo-free".
   return {
     "Content-Type": "application/json",
-    Authorization: "Bearer kilo-free",
   };
 }
 
-// ── OpenCode Zen free-tier fingerprint (mirrors pi-bansos 0.4.10) ──
+// ── OpenCode Zen free-tier fingerprint (mirrors pi-bansos 0.4.13, OPENCODE_CLIENT_VERSION 1.18.31) ──
 // Public client imitation: no secrets, talks direct to opencode.ai.
 // Missing any gate (UA, Bearer public, desktop/global, ses_ shape,
 // tool quartet, stream:true) → 403 FreeTierError.
@@ -272,10 +273,19 @@ export const BANSOS_MODELS: BansosModel[] = [
   },
   { id: "muse-spark-1.2-contributor-free", vision: true, reasoning: true, note: "1M ctx" },
   { id: "mimo-v2.5-free", vision: true, reasoning: true, note: "200K" },
-  { id: "ling-3.0-flash-fin-free", vision: false, reasoning: true, note: "262K" },
+  { id: "mimo-v2.6-flash-free", vision: true, reasoning: true, note: "200K" },
   { id: "nemotron-3-ultra-free", vision: false, reasoning: true, note: "1M" },
   { id: "nemotron-3.5-lightning-free", vision: false, reasoning: true, note: "262K lento" },
   { id: "big-pickle", vision: false, reasoning: true, note: "200K" },
+  { id: "space-bunny-free", vision: true, reasoning: true, note: "1M" },
+  { id: "fledge-alpha-free", vision: true, reasoning: true, note: "1M (vivo 04/10)" },
+  {
+    id: "ling-3.1-flash-free",
+    vision: false,
+    reasoning: true,
+    note: "262K text-only: vision 400 (04/10)",
+  },
+  { id: "longcat-2.5-preview-free", vision: true, reasoning: true, note: "1M (vivo 04/10)" },
   { id: "kilo-auto/free", vision: false, reasoning: false, note: "256K rápido s/ reasoning" },
   { id: "stepfun/step-3.7-flash:free", vision: true, reasoning: true, note: "vision 262K" },
   { id: "nvidia/nemotron-3-ultra-550b-a55b:free", vision: false, reasoning: true, note: "1M" },
@@ -300,7 +310,19 @@ export const BANSOS_MODELS: BansosModel[] = [
   { id: "inclusionai/ling-3.0-flash-sante:free", vision: false, reasoning: true, note: "262K" },
   { id: "liquid/lfm-2.5-2.6b:free", vision: false, reasoning: true, note: "65K rápido" },
   { id: "poolside/laguna-s-2.1:free", vision: false, reasoning: true, note: "262K" },
-  { id: "inclusionai/ling-3.0-flash-fin:free", vision: false, reasoning: true, note: "262K" },
+  {
+    id: "thinkingmachines/inkling-small:free",
+    vision: true,
+    reasoning: true,
+    note: "1M (vivo 28/09 rate → herdado)",
+  },
+  { id: "qwen/qwen3.8-27b:free", vision: true, reasoning: true, note: "262K" },
+  {
+    id: "apodex/apodex-1.1-mini:free",
+    vision: false,
+    reasoning: true,
+    note: "262K (vivo 04/10)",
+  },
 ];
 
 function getCurrentAskModel(): string {
