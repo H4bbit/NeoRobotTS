@@ -7,7 +7,7 @@
     /* Environment / Module system */
     "module": "nodenext",
     "moduleResolution": "nodenext",
-    "target": "esnext",
+    "target": "es2025",
     "lib": ["esnext"],
     "types": ["node"],
 
