@@ -25,7 +25,7 @@ import {
 } from "../utils/sticker.js";
 import { animatedWebpToVideoViaPillow } from "../utils/tovideoPillow.js";
 import { deleteAiConfig, isAiPvEnabled, isGroupActive, setAiConfig, setGroupActive } from "./db.js";
-import { getMenuText } from "./menu.js";
+import { getMenuText, getMenuUsage, normalizeMenuSection } from "./menu.js";
 import { reply, requireBotAdmin, requireGroup, requireSenderAdmin } from "./helpers.js";
 import {
   askBansos,
@@ -87,10 +87,13 @@ export async function commandController(
       break;
     }
 
-    case "menu":
-    case "help":
-    case "ajuda": {
-      await reply(sock, jid, msg, "📋", getMenuText());
+    case "menu": {
+      const section = parts[1];
+      if (section && !normalizeMenuSection(section)) {
+        await reply(sock, jid, msg, "❓", getMenuUsage());
+        break;
+      }
+      await reply(sock, jid, msg, "📋", getMenuText(section));
       break;
     }
 
