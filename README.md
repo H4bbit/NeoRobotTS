@@ -50,6 +50,7 @@ npm start
 | Comando | Descrição |
 |---------|-----------|
 | `!ping` | Responde Pong |
+| `!menu` (`!help`, `!ajuda`) | Mostra o menu de comandos |
 | `!boton` / `!botoff` | Ativa/desativa o bot no grupo (persiste em SQLite) |
 
 ### Mídia

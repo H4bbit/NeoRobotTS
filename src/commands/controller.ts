@@ -25,6 +25,7 @@ import {
 } from "../utils/sticker.js";
 import { animatedWebpToVideoViaPillow } from "../utils/tovideoPillow.js";
 import { deleteAiConfig, isAiPvEnabled, isGroupActive, setAiConfig, setGroupActive } from "./db.js";
+import { getMenuText } from "./menu.js";
 import { reply, requireBotAdmin, requireGroup, requireSenderAdmin } from "./helpers.js";
 import {
   askBansos,
@@ -83,6 +84,13 @@ export async function commandController(
   switch (command) {
     case "ping": {
       await reply(sock, jid, msg, "🏓", "Pong 🏓");
+      break;
+    }
+
+    case "menu":
+    case "help":
+    case "ajuda": {
+      await reply(sock, jid, msg, "📋", getMenuText());
       break;
     }
 
