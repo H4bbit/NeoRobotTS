@@ -18,7 +18,7 @@
     "@types/better-sqlite3": "^7.6.13",
     "@types/fluent-ffmpeg": "^2.1.28",
     "@types/node": "^25.0.6",
-    "typescript": "^5.9.3"
+    "typescript": "^6.0.3"
   },
   "dependencies": {
     "baileys": "^7.0.0-rc14",

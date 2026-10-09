@@ -1,6 +1,6 @@
 # NeoRobotTS 🤖
 
-![Node](https://img.shields.io/badge/Node-24.x-brightgreen) ![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue) ![Baileys](https://img.shields.io/badge/Baileys-7.x-black) ![License](https://img.shields.io/badge/license-ISC-yellow) ![Platform](https://img.shields.io/badge/platform-Termux%20%7C%20Linux-lightgrey)
+![Node](https://img.shields.io/badge/Node-24.x-brightgreen) ![TypeScript](https://img.shields.io/badge/TypeScript-6.x-blue) ![Baileys](https://img.shields.io/badge/Baileys-7.x-black) ![License](https://img.shields.io/badge/license-ISC-yellow) ![Platform](https://img.shields.io/badge/platform-Termux%20%7C%20Linux-lightgrey)
 
 Bot de WhatsApp escrito em **TypeScript** utilizando **Baileys**, com arquitetura modular e persistência local em SQLite.
 
@@ -20,7 +20,7 @@ O projeto é desenvolvido principalmente no **Termux (Android)**, mas pode ser e
 ## 🛠️ Stack
 
 - Node.js 24+
-- TypeScript 5.x
+- TypeScript 6.x
 - Baileys 7.x RC (7.0.0-rc14)
 - better-sqlite3 + SQLite
 - ffmpeg + webpmux + Pillow via `python3` (conversão de mídia; Pillow isolado em `!tovideo2`)
@@ -153,7 +153,7 @@ O projeto é desenvolvido e testado utilizando:
 
 - Termux
 - Node.js 24.x
-- TypeScript 5.x
+- TypeScript 6.x
 - Baileys 7.x RC (7.0.0-rc14, 0 vulnerabilities)
 - Biome 2.5
 
