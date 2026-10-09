@@ -10,7 +10,7 @@ import {
 } from "baileys";
 import Database from "better-sqlite3";
 
-export async function useSQLiteAuthState(dbPath: string): Promise<{
+export function useSQLiteAuthState(dbPath: string): Promise<{
   state: AuthenticationState;
   saveCreds: () => Promise<void>;
 }> {
@@ -91,5 +91,5 @@ export async function useSQLiteAuthState(dbPath: string): Promise<{
     write("creds", state.creds);
   };
 
-  return { state, saveCreds };
+  return Promise.resolve({ state, saveCreds });
 }
