@@ -160,25 +160,33 @@ export async function downloadStickerMedia(media: DownloadableMedia): Promise<Bu
   return Buffer.concat(chunks);
 }
 
-async function createTempPaths(ext: string): Promise<{
-  dir: string;
-  input: string;
-  output: string;
-}> {
-  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "neorobot-"));
+class TempDir implements AsyncDisposable {
+  readonly dir: string;
+  readonly input: string;
+  readonly output: string;
 
-  return {
-    dir,
-    input: path.join(dir, `${crypto.randomUUID()}.${ext}`),
-    output: path.join(dir, `${crypto.randomUUID()}.webp`),
-  };
-}
+  private constructor(dir: string, input: string, output: string) {
+    this.dir = dir;
+    this.input = input;
+    this.output = output;
+  }
 
-async function cleanup(dir: string) {
-  await fs.rm(dir, {
-    recursive: true,
-    force: true,
-  });
+  static async create(ext: string): Promise<TempDir> {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "neorobot-"));
+
+    return new TempDir(
+      dir,
+      path.join(dir, `${crypto.randomUUID()}.${ext}`),
+      path.join(dir, `${crypto.randomUUID()}.webp`),
+    );
+  }
+
+  async [Symbol.asyncDispose](): Promise<void> {
+    await fs.rm(this.dir, {
+      recursive: true,
+      force: true,
+    });
+  }
 }
 
 async function runFfmpeg(command: ffmpeg.FfmpegCommand, timeoutMs?: number): Promise<void> {
@@ -467,7 +475,7 @@ export async function animatedWebpToVideo(buffer: Buffer): Promise<Buffer> {
       throw error;
     }
 
-    const temp = await createTempPaths("webp");
+    await using temp = await TempDir.create("webp");
   const framesDir = path.join(temp.dir, "frames");
   const concatFile = path.join(temp.dir, "frames.txt");
   const output = path.join(temp.dir, `${crypto.randomUUID()}.mp4`);
@@ -605,8 +613,6 @@ export async function animatedWebpToVideo(buffer: Buffer): Promise<Buffer> {
         "webp_conversion_failed",
         stage,
       );
-    } finally {
-      await cleanup(temp.dir);
     }
   });
 }
@@ -625,9 +631,9 @@ export async function webpToImage(buffer: Buffer): Promise<Buffer> {
       "validate_input",
     );
   }
-  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "neorobot-"));
-  const input = path.join(dir, `${crypto.randomUUID()}.webp`);
-  const output = path.join(dir, `${crypto.randomUUID()}.png`);
+  await using temp = await TempDir.create("webp");
+  const input = temp.input;
+  const output = path.join(temp.dir, `${crypto.randomUUID()}.png`);
   try {
     await fs.writeFile(input, buffer);
     await runFfmpeg(ffmpeg(input).outputOptions("-y").output(output), PROCESS_TIMEOUT_MS);
@@ -650,8 +656,6 @@ export async function webpToImage(buffer: Buffer): Promise<Buffer> {
         "webp_to_image_failed",
         "encode_video",
       );
-    } finally {
-      await cleanup(dir);
     }
   });
 }
@@ -666,27 +670,23 @@ export async function imageToSticker(buffer: Buffer, author: string): Promise<Bu
       { type: "sticker_event", event: "image_start", inputSize: buffer.length },
       "image sticker started",
     );
-    const temp = await createTempPaths("png");
+    await using temp = await TempDir.create("png");
 
-    try {
-      await fs.writeFile(temp.input, buffer);
-      await runFfmpeg(ffmpeg(temp.input).outputOptions("-vf", "scale=512:512").output(temp.output));
-      const sticker = await fs.readFile(temp.output);
-      const out = await addStickerMetadata(sticker, PACK_NAME, AUTHOR_TEMPLATE(author));
-      stickerLogger.info(
-        {
-          type: "sticker_event",
-          event: "image_success",
-          inputSize: buffer.length,
-          outputSize: out.length,
-          durationMs: Date.now() - startMs,
-        },
-        "image sticker succeeded",
-      );
-      return out;
-    } finally {
-      await cleanup(temp.dir);
-    }
+    await fs.writeFile(temp.input, buffer);
+    await runFfmpeg(ffmpeg(temp.input).outputOptions("-vf", "scale=512:512").output(temp.output));
+    const sticker = await fs.readFile(temp.output);
+    const out = await addStickerMetadata(sticker, PACK_NAME, AUTHOR_TEMPLATE(author));
+    stickerLogger.info(
+      {
+        type: "sticker_event",
+        event: "image_success",
+        inputSize: buffer.length,
+        outputSize: out.length,
+        durationMs: Date.now() - startMs,
+      },
+      "image sticker succeeded",
+    );
+    return out;
   });
 }
 export async function videoToSticker(buffer: Buffer, author: string): Promise<Buffer> {
@@ -696,10 +696,9 @@ export async function videoToSticker(buffer: Buffer, author: string): Promise<Bu
       { type: "sticker_event", event: "video_start", inputSize: buffer.length },
       "video sticker started",
     );
-    const temp = await createTempPaths("mp4");
+    await using temp = await TempDir.create("mp4");
 
-    try {
-      await fs.writeFile(temp.input, buffer);
+    await fs.writeFile(temp.input, buffer);
 
     await runFfmpeg(
       ffmpeg(temp.input)
@@ -730,8 +729,5 @@ export async function videoToSticker(buffer: Buffer, author: string): Promise<Bu
         "video sticker succeeded",
       );
       return out;
-    } finally {
-      await cleanup(temp.dir);
-    }
   });
 }
