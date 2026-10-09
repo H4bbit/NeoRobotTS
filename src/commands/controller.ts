@@ -467,7 +467,7 @@ export async function commandController(
       }
       break;
     }
-    case "ialist": {
+    case "ailist": {
       if (!(await requireOwner(sock, msg, jid))) break;
       const curAsk = getAskModel();
       const curVision = getVisionModel();
@@ -547,7 +547,7 @@ export async function commandController(
         await sock.sendMessage(
           jid,
           {
-            text: `🤖 *Modelos atuais*\n• ask: \`${curAsk}\`\n• vision: \`${curVision}\`\n\nUse: !ialist pra ver a lista\n!iamodel <id> → ask\n!iamodel vision <id> → vision\n!iamodel reset`,
+            text: `🤖 *Modelos atuais*\n• ask: \`${curAsk}\`\n• vision: \`${curVision}\`\n\nUse: !ailist pra ver a lista\n!iamodel <id> → ask\n!iamodel vision <id> → vision\n!iamodel reset`,
           },
           { quoted: msg },
         );
@@ -589,7 +589,7 @@ export async function commandController(
           jid,
           msg,
           "❌",
-          `❌ \`${targetId}\` não está entre os modelos disponíveis. Use !ialist`,
+          `❌ \`${targetId}\` não está entre os modelos disponíveis. Use !ailist`,
         );
         break;
       }
@@ -599,7 +599,7 @@ export async function commandController(
           jid,
           msg,
           "❌",
-          `❌ \`${targetId}\` não suporta imagem (sem 👁️). Escolha um com 👁️ no !ialist`,
+          `❌ \`${targetId}\` não suporta imagem (sem 👁️). Escolha um com 👁️ no !ailist`,
         );
         break;
       }
